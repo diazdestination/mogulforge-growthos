@@ -7,7 +7,7 @@ not built, and how to verify it. It uses MogulForge GrowthOS terminology only.
 ## What it is
 
 GrowthOS specialists are bounded workflows, not autonomous agents. Zapier
-Connected Apps gives six of them a narrow set of *bound capabilities* in the
+Connected Apps gives seven of them a narrow set of *bound capabilities* in the
 apps a contractor already uses, through the contractor's own Zapier account:
 
 | Specialist | Capability | Direction | Default policy |
@@ -16,8 +16,14 @@ apps a contractor already uses, through the contractor's own Zapier account:
 | SCOUT | `scout.leads.list` — marketplace leads become GrowthOS opportunities | read | off |
 | APPT | `appt.calendar.create_event` — explicitly request a calendar event for a booked appointment | write | off |
 | APPT | `appt.sms.send` — appointment reminder texted to a consented customer from the contractor's number | write | off |
+| SCOUT | `scout.inbox.list` — customer email replies from the connected mailbox become activities and follow-up tasks | read | off |
+| SCOUT | `scout.sms.review_request` — review link texted once per finished visit or job from the contractor's number | write | off |
 | INVO | `invo.accounting.create_invoice` — request an issued invoice export to accounting | write | off |
+| INVO | `invo.accounting.record_payment` — a recorded receipt becomes a payment on the exported invoice (QuickBooks, Xero) | write | off |
+| INVO | `invo.email.send` — issued invoice emailed from the contractor's own Gmail/Outlook | write | off |
+| ESTI | `esti.email.send` — draft estimate emailed from the contractor's own Gmail/Outlook | write | off |
 | CALLIE | `callie.calls.list` — phone-system calls become callback tasks | read | off |
+| CALLIE | `callie.sms.inbox.list` — texts received on the contractor's number: known-customer replies logged, STOP/START applied to text consent | read | off |
 | CALLIE | `callie.sms.send` — text back a missed caller through the existing governed path | write | off |
 | SCHED | `sched.sms.send` — selected company-date day sheet texted to a crew member | write | off |
 | MAINTAIN | `maintain.sms.send` — service-due reminder texted to a consented customer | write | off |
@@ -39,8 +45,9 @@ and [Quo's business-texting registration](https://learn.quo.com/setting-up-quo/r
   contact, per-channel opt-out, suppression and SMS consent. MAINTAIN also uses
   the outreach gate (sending hours, caps, reply holds) and its notice window.
 - Every APPT/MAINTAIN customer text ends with "Reply STOP to opt out." Replies and STOP requests land
-  in the contractor's phone app, not GrowthOS; staff mark an opted-out
-  customer do not text on the customer record.
+  in the contractor's phone app. With `callie.sms.inbox.list` bound, GrowthOS
+  also reads them (see below); without it, staff mark an opted-out customer
+  do not text on the customer record.
 - The automated appointment reminder uses `appt.sms.send` only when built-in
   texting is not active for the company and the capability is bound with a
   policy that is not off. Built-in and own-number reminder paths share
@@ -52,6 +59,56 @@ and [Quo's business-texting registration](https://learn.quo.com/setting-up-quo/r
   blocks the approval instead of sending stale copy. A service gets at most one
   own-number reminder while any earlier one is pending, sent or uncertain, and
   never after a built-in MAINTAIN reminder or a recorded customer response.
+
+### Owned-app flows (mailbox, reviews, payments)
+
+Built 2026-11-11 on `feat/zapflows-20261111`. These let a contractor work from
+their own Gmail/Outlook, number and QuickBooks/Xero without a GrowthOS mail
+connection or a MogulForge Microsoft app. Code: `zapier-owned-app-flows.ts`.
+
+- **Invoice/estimate email** is a separate "send via my mailbox" path, not a
+  sender option inside native delivery. The native kernels pin a GrowthOS
+  mailbox credential in hash-pinned review schemas and recheck it at dispatch,
+  and their attempts run synchronously; Zapier parks for approval and owns its
+  own durable receipt. Mixing them would nest two receipts per send. Instead
+  the two paths exclude each other: the Zapier path refuses an invoice with
+  any native attempt (and a non-initial or already-sent estimate), and native
+  delivery refuses while a Zapier email owns the record. Content uses the
+  native renderers. Ledger `succeeded` means the mail app accepted the message
+  (not delivered); `indeterminate` is never retried and holds both paths.
+  An accepted estimate email marks the draft sent. Two capabilities (not one)
+  so INVO and ESTI keep their own policy and budget.
+- **Email replies**: `scout.inbox.list` (Gmail Find Email / Outlook Find
+  Emails) logs mail only from an address matching exactly one customer
+  contact; unknown, ambiguous and sender-less mail is ignored. Messages are
+  deduped by `app:messageId` across windows, stored as a bounded untrusted
+  snippet with provenance, never acted on, and create one review task. A reply
+  pauses that lead's active playbook enrollments. It does not create a native
+  reply hold (that needs signed outbound evidence Zapier cannot provide) and
+  does not cancel already-scheduled actions.
+- **Review request**: requested by staff for a completed appointment or
+  project. Outreach send gate (consent, opt-out, sending hours, reply holds),
+  the existing review engagement link, the opt-out line, once per job and at
+  most once per phone in 90 days. These texts do not reserve frequency-cap
+  touches.
+- **Text replies and opt-outs**: `callie.sms.inbox.list` (Quo Message
+  Received / Twilio New Received SMS; action keys unverified) is polled like
+  the other reads and covers every own-number text (APPT, MAINTAIN, CALLIE,
+  SCHED, SCOUT and later ones). Records are processed oldest first and deduped
+  by `app:messageId`; outgoing records are skipped. The keyword list and
+  consent effects match the built-in Twilio inbound webhook: STOP from any
+  number suppresses that phone for the company and, for every matching
+  contact, sets do not text and records a revoked SMS consent, so the send
+  gate refuses later texts. START/UNSTOP lifts only a STOP suppression recorded
+  before it, and (like the webhook) re-grants no consent and leaves do not
+  text set, so fresh consent is needed before texting resumes. Non-keyword
+  replies from a phone matching exactly one contact are logged as untrusted
+  text with a task and pause that lead's follow-up; unknown and shared numbers
+  are not logged. Opt-outs reach GrowthOS only at the next poll (default
+  every 4 hours); a text requested in between can still be sent.
+- **Payment**: once per receipt allocation, refused unless
+  `invo.accounting.create_invoice` succeeded for the invoice to the same app,
+  and refused at approval if the receipt was reversed.
 
 CALLIE's existing phone-sync/text-back path is separate. The client action panel
 does not expose it while callback eligibility and customer-consent review are
@@ -131,11 +188,12 @@ records with provenance (`source = zapier:<App>`, `import_source_key`,
 
 ## Scheduler
 
-Stage `zapier-connected-apps` (after `callie-intake`) runs the three read syncs
-for every connected organization whose capability is bound and set to `auto`.
-Idempotency keys use an hourly window, so the 60-second cadence spends at most
-one Zapier read per capability per hour. Writes never originate from the
-scheduler.
+Stage `zapier-connected-apps` (after `callie-intake`) runs the five read syncs
+(leads, reviews, calls, email inbox, text replies) for every connected organization whose
+capability is bound and set to `auto`. Idempotency keys use the company's poll
+window (`zapier_mcp_connections.poll_interval_minutes`, default 240, choices 1h
+to 24h, set in Settings), so the 60-second cadence spends at most one Zapier
+read per capability per window. Writes never originate from the scheduler.
 
 ## Routes
 
@@ -169,11 +227,14 @@ database with the MCP transport faked in memory.
   2026-10-29 (`QuickBooksV3CLIAPI`, `GoogleCalendarCLIAPI`, `CallRailCLIAPI`,
   `TwilioCLIAPI`, `GoogleMyBusinessCLIAPI`, `FacebookLeadsCLIAPI`,
   `FacebookLeadAdsCLIAPI`, `OpenPhoneCLIAPI` (listed as Quo), `XeroCLIAPI`,
-  `MicrosoftOutlookCLIAPI`, `HousecallProCLIAPI`, `JobberCLIAPI`). Action keys
+  `MicrosoftOutlookCLIAPI`, `HousecallProCLIAPI`, `JobberCLIAPI`). The Gmail
+  app id `GoogleMailV2CLIAPI` (2026-11-11) was not verified. Action keys
   and parameter names were not verified against a live server; the binding
   step also matches by display name, and the first live run per app must
   confirm the action's parameter names. Angi and Thumbtack have no Zapier app.
-- ESTI and BILL have no Zapier capabilities yet. MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
+- BILL has no Zapier capabilities on this branch (payment-link texts are
+  separate work). Invoice/estimate email is not a sender option inside native
+  delivery (see above). MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
 - No Zapier *trigger* (push) integration: reads are polled by the scheduler.
 - No "GrowthOS as a Zapier app" listing; that is a separate partner-program
   decision.

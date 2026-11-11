@@ -31,7 +31,7 @@ import { hasServiceSmsReplyHold } from "../service-sms";
 import { readStandingService, standingLineage, standingCompanyProjection } from "../service-standing-policy";
 import { phoneE164, twilioForOrganization } from "../twilio-controls";
 import { getZapierCapability } from "./zapier-capabilities";
-import { defaultPolicyFor, getZapierBinding, getZapierPolicy } from "./zapier-connection";
+import { defaultPolicyFor, getZapierBinding, getZapierPolicy, zapierPollWindow } from "./zapier-connection";
 import { requestZapierAction, ZapierExecutionError, type ZapierActionOutcome } from "./zapier-executions";
 import { sha256Hex } from "./zapier-mcp-client";
 
@@ -177,9 +177,9 @@ export async function invoPushInvoiceToAccounting(input: {
 
 // ---------- SCOUT: marketplace leads and reviews -> GrowthOS ----------
 
-type InboundRecord = Record<string, unknown>;
+export type InboundRecord = Record<string, unknown>;
 
-function pick(record: InboundRecord, keys: string[]): string | undefined {
+export function pick(record: InboundRecord, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim().slice(0, 500);
@@ -188,7 +188,7 @@ function pick(record: InboundRecord, keys: string[]): string | undefined {
   return undefined;
 }
 
-function recordsOf(value: unknown): InboundRecord[] {
+export function recordsOf(value: unknown): InboundRecord[] {
   if (Array.isArray(value)) return value.filter((item) => item && typeof item === "object") as InboundRecord[];
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
@@ -219,7 +219,7 @@ export async function scoutSyncMarketplaceLeads(input: {
   actorUserId: string | null;
 }): Promise<ScoutSyncSummary> {
   const binding = await getZapierBinding(input.organizationId, "scout.leads.list");
-  const stamp = new Date().toISOString().slice(0, 13); // hourly idempotency window
+  const stamp = await zapierPollWindow(input.organizationId); // per-company read window
   const outcome = await requestZapierAction({
     organizationId: input.organizationId,
     capability: "scout.leads.list",
@@ -273,7 +273,7 @@ export async function scoutSyncReviews(input: {
   actorUserId: string | null;
 }): Promise<ScoutSyncSummary> {
   const binding = await getZapierBinding(input.organizationId, "scout.reviews.list");
-  const stamp = new Date().toISOString().slice(0, 13);
+  const stamp = await zapierPollWindow(input.organizationId);
   const outcome = await requestZapierAction({
     organizationId: input.organizationId,
     capability: "scout.reviews.list",
@@ -329,7 +329,7 @@ export async function callieSyncCalls(input: {
   actorUserId: string | null;
 }): Promise<ScoutSyncSummary & { textbacksRequested: number }> {
   const binding = await getZapierBinding(input.organizationId, "callie.calls.list");
-  const stamp = new Date().toISOString().slice(0, 13);
+  const stamp = await zapierPollWindow(input.organizationId);
   const outcome = await requestZapierAction({
     organizationId: input.organizationId,
     capability: "callie.calls.list",
@@ -525,7 +525,7 @@ export async function otherOpenText(organizationId: string, capability: Customer
   return row ?? null;
 }
 
-function textBlocked(reason: string): never {
+export function textBlocked(reason: string): never {
   const readable: Record<string, string> = {
     no_sms_consent: "this customer has not agreed to receive texts",
     do_not_contact: "this customer is marked do not contact",
@@ -750,8 +750,10 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Service text request is not rebuildable.", "invalid_input");
       return (await buildServiceReminderTextInput(execution.organizationId, match[1]!, Number(match[2]), `zapier:${execution.id}`)).input;
     }
-    default:
-      throw new ZapierExecutionError("This capability has no approval path.", "invalid_input");
+    default: {
+      const { rebuildOwnedAppRequestInput } = await import("./zapier-owned-app-flows");
+      return rebuildOwnedAppRequestInput(execution);
+    }
   }
 }
 

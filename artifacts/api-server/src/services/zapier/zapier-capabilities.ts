@@ -24,6 +24,12 @@ export const ZAPIER_CAPABILITY_KEYS = [
   "callie.sms.send",
   "sched.sms.send",
   "maintain.sms.send",
+  "invo.email.send",
+  "esti.email.send",
+  "scout.inbox.list",
+  "scout.sms.review_request",
+  "invo.accounting.record_payment",
+  "callie.sms.inbox.list",
 ] as const;
 export type ZapierCapabilityKey = (typeof ZAPIER_CAPABILITY_KEYS)[number];
 
@@ -64,6 +70,23 @@ export const ACCOUNTING_INVOICE_INPUT = z.object({
 export const SMS_SEND_INPUT = z.object({
   toPhone: z.string().regex(/^\+?[1-9]\d{6,14}$/),
   body: z.string().min(1).max(1200),
+});
+
+/** One plain-text customer email sent from the contractor's own mailbox. */
+export const EMAIL_SEND_INPUT = z.object({
+  to: z.string().email().max(320),
+  subject: z.string().min(1).max(300),
+  body: z.string().min(1).max(20000),
+});
+
+export const ACCOUNTING_PAYMENT_INPUT = z.object({
+  /** The invoice number GrowthOS already exported to accounting. */
+  invoiceNumber: z.string().min(1).max(64),
+  customerName: z.string().min(1).max(200),
+  amountCents: z.number().int().positive(),
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** The recorded receipt's own reference (check number, Stripe sandbox id, ...). */
+  reference: z.string().min(1).max(120),
 });
 
 export const LIST_SINCE_INPUT = z.object({
@@ -134,6 +157,20 @@ function smsCandidate(app: string, appName: string, action: string, actionName: 
     toParams: (raw, config) => {
       const input = SMS_SEND_INPUT.parse(raw);
       return { [fromKey]: config[fromKey], to_number: input.toPhone, body: input.body };
+    },
+  };
+}
+
+function emailCandidate(app: string, appName: string, action: string, actionName: string, formatKey: string, formatValue: string): ZapierActionCandidate {
+  return {
+    app,
+    appName,
+    action,
+    actionName,
+    configFields: [],
+    toParams: (raw) => {
+      const input = EMAIL_SEND_INPUT.parse(raw);
+      return { to: input.to, subject: input.subject, body: input.body, [formatKey]: formatValue };
     },
   };
 }
@@ -337,6 +374,35 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     ],
   },
   {
+    key: "callie.sms.inbox.list",
+    specialistId: "callie",
+    direction: "read",
+    label: "Log customer text replies and opt-outs",
+    description: "CALLIE reads texts received on the contractor's own number. Replies from known customers are logged for staff review; STOP and START keywords update text consent the same way built-in texting does. Unknown numbers are not logged, and message content is never treated as instructions.",
+    inputSchema: LIST_SINCE_INPUT,
+    summaryFields: ["since"],
+    defaultMode: "auto",
+    defaultDailyBudget: 24,
+    candidates: [
+      {
+        app: "OpenPhoneCLIAPI",
+        appName: "Quo",
+        action: "message_received",
+        actionName: "Message Received",
+        configFields: [{ key: "phone_number_id", label: "Quo number", required: false }],
+        toParams: (_raw, config) => ({ phone_number_id: config.phone_number_id ?? undefined }),
+      },
+      {
+        app: "TwilioCLIAPI",
+        appName: "Twilio",
+        action: "new_received_sms",
+        actionName: "New Received SMS",
+        configFields: [{ key: "phone_number", label: "Twilio number", required: false }],
+        toParams: (_raw, config) => ({ phone_number: config.phone_number ?? undefined }),
+      },
+    ],
+  },
+  {
     key: "callie.sms.send",
     specialistId: "callie",
     direction: "write",
@@ -379,6 +445,128 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     candidates: [
       smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
       smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
+    key: "invo.email.send",
+    specialistId: "invo",
+    direction: "write",
+    label: "Email issued invoices from your mailbox",
+    description: "INVO emails an issued invoice to the customer from the contractor's own Gmail or Outlook mailbox, once per issued document.",
+    inputSchema: EMAIL_SEND_INPUT,
+    summaryFields: ["to", "subject"],
+    defaultMode: "approve",
+    defaultDailyBudget: 40,
+    candidates: [
+      emailCandidate("GoogleMailV2CLIAPI", "Gmail", "message", "Send Email", "body_type", "plain"),
+      emailCandidate("MicrosoftOutlookCLIAPI", "Microsoft Outlook", "send_email", "Send Email", "body_format", "text"),
+    ],
+  },
+  {
+    key: "esti.email.send",
+    specialistId: "esti",
+    direction: "write",
+    label: "Email estimates from your mailbox",
+    description: "ESTI emails a saved draft estimate to the customer from the contractor's own Gmail or Outlook mailbox, once, then marks it sent.",
+    inputSchema: EMAIL_SEND_INPUT,
+    summaryFields: ["to", "subject"],
+    defaultMode: "approve",
+    defaultDailyBudget: 40,
+    candidates: [
+      emailCandidate("GoogleMailV2CLIAPI", "Gmail", "message", "Send Email", "body_type", "plain"),
+      emailCandidate("MicrosoftOutlookCLIAPI", "Microsoft Outlook", "send_email", "Send Email", "body_format", "text"),
+    ],
+  },
+  {
+    key: "scout.inbox.list",
+    specialistId: "scout",
+    direction: "read",
+    label: "Log customer email replies",
+    description: "SCOUT reads recent inbox email and logs messages from known customers on their record for staff review. Unknown senders are ignored; email content is never treated as instructions.",
+    inputSchema: LIST_SINCE_INPUT,
+    summaryFields: ["since"],
+    defaultMode: "auto",
+    defaultDailyBudget: 24,
+    candidates: [
+      {
+        app: "GoogleMailV2CLIAPI",
+        appName: "Gmail",
+        action: "find_email",
+        actionName: "Find Email",
+        configFields: [{ key: "query", label: "Search (Gmail syntax)", required: false }],
+        toParams: (_raw, config) => ({ query: typeof config.query === "string" && config.query.trim() ? config.query : "in:inbox newer_than:2d" }),
+      },
+      {
+        app: "MicrosoftOutlookCLIAPI",
+        appName: "Microsoft Outlook",
+        action: "find_emails",
+        actionName: "Find Emails",
+        configFields: [{ key: "search_string", label: "Search", required: false }],
+        toParams: (_raw, config) => ({ search_string: typeof config.search_string === "string" && config.search_string.trim() ? config.search_string : "received>=yesterday" }),
+      },
+    ],
+  },
+  {
+    key: "scout.sms.review_request",
+    specialistId: "scout",
+    direction: "write",
+    label: "Text review requests after finished work",
+    description: "SCOUT texts a consented customer your review link once per completed appointment or job, from the contractor's own number.",
+    inputSchema: SMS_SEND_INPUT,
+    summaryFields: ["toPhone"],
+    defaultMode: "approve",
+    defaultDailyBudget: 30,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
+    key: "invo.accounting.record_payment",
+    specialistId: "invo",
+    direction: "write",
+    label: "Record received payments in accounting",
+    description: "INVO records one GrowthOS receipt as a payment against the invoice it already exported to the contractor's accounting app.",
+    inputSchema: ACCOUNTING_PAYMENT_INPUT,
+    summaryFields: ["invoiceNumber", "amountCents", "paidOn", "reference"],
+    defaultMode: "approve",
+    defaultDailyBudget: 25,
+    candidates: [
+      {
+        app: "QuickBooksV3CLIAPI",
+        appName: "QuickBooks Online",
+        action: "payment",
+        actionName: "Create Payment",
+        configFields: [{ key: "deposit_to_account", label: "Deposit account", required: false }],
+        toParams: (raw, config) => {
+          const input = ACCOUNTING_PAYMENT_INPUT.parse(raw);
+          return {
+            customer_name: input.customerName,
+            invoice_number: input.invoiceNumber,
+            amount: cents(input.amountCents),
+            txn_date: input.paidOn,
+            payment_ref_num: input.reference,
+            deposit_to_account: typeof config.deposit_to_account === "string" ? config.deposit_to_account : "",
+          };
+        },
+      },
+      {
+        app: "XeroCLIAPI",
+        appName: "Xero",
+        action: "payment",
+        actionName: "Create Payment",
+        configFields: [{ key: "account", label: "Bank account", required: true }],
+        toParams: (raw, config) => {
+          const input = ACCOUNTING_PAYMENT_INPUT.parse(raw);
+          return {
+            invoice_number: input.invoiceNumber,
+            amount: cents(input.amountCents),
+            date: input.paidOn,
+            reference: input.reference,
+            account: config.account,
+          };
+        },
+      },
     ],
   },
 ];

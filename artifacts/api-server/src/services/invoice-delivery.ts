@@ -239,6 +239,15 @@ async function eligibility(
       "invoice_delivery_held",
       `Invoice email is not permitted (${gate.reason}). No email was sent.`,
     );
+  // A Zapier mailbox email for this invoice that is waiting, uncertain or sent
+  // owns customer delivery; the two paths never both reach the customer.
+  const { zapierInvoiceEmailOwner } = await import("./zapier/zapier-owned-app-flows");
+  if (await zapierInvoiceEmailOwner(org, value.snapshot.invoiceId))
+    throw new InvoiceError(
+      409,
+      "invoice_delivery_held",
+      "This invoice has an email request through your connected mailbox (Zapier). Review it in Settings > Connections before sending here. No email was sent.",
+    );
   // Transactional send-gate intentionally does not apply outreach reply holds.
   // Returning invoices have an explicit, narrower reviewed-contact requirement.
   if (

@@ -18,7 +18,9 @@ import { ZapierFlowActions } from './zapier-flow-actions';
  * one enabled action and governed by an off / approve / auto policy.
  */
 
-const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send'];
+const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'scout.sms.review_request'];
+const CUSTOMER_EMAIL_KEYS = ['invo.email.send', 'esti.email.send'];
+const pollLabel = (minutes: number) => minutes % 60 === 0 ? `Every ${minutes / 60 === 1 ? 'hour' : `${minutes / 60} hours`}` : `Every ${minutes} minutes`;
 
 type ZapierStatus = {
   configured: boolean;
@@ -30,6 +32,8 @@ type ZapierStatus = {
   lastUsedAt: string | null;
   lastErrorAt: string | null;
   lastErrorCode: string | null;
+  pollIntervalMinutes?: number;
+  pollIntervalChoices?: number[];
 };
 
 type LiveAction = {
@@ -337,6 +341,21 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
     }
   };
 
+  const setPollInterval = async (minutes: number) => {
+    if (mutationRef.current || !canManage || !connectedRef.current) return;
+    mutationRef.current = true;
+    setBusy('poll');
+    try {
+      await api('/integrations/zapier/poll-interval', { method: 'PUT', body: JSON.stringify({ minutes }) });
+      await load();
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : 'Could not update the sync interval', variant: 'destructive' });
+    } finally {
+      mutationRef.current = false;
+      setBusy(null);
+    }
+  };
+
   const unbind = async (capability: Capability) => {
     if (mutationRef.current || !canManage || !connectedRef.current) return;
     mutationRef.current = true;
@@ -425,6 +444,22 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
                 )}
               </div>
             </div>
+
+            {status.connected && status.pollIntervalMinutes && status.pollIntervalChoices?.length ? (
+              <div className="space-y-1">
+                <Label htmlFor="zapier-poll-interval">Automatic sync interval</Label>
+                <select
+                  id="zapier-poll-interval"
+                  className="h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm"
+                  value={status.pollIntervalMinutes}
+                  disabled={!canManage || busy !== null}
+                  onChange={(event) => void setPollInterval(Number(event.target.value))}
+                >
+                  {status.pollIntervalChoices.map((minutes) => <option key={minutes} value={minutes}>{pollLabel(minutes)}</option>)}
+                </select>
+                <p className="text-xs text-muted-foreground">How often automatic reads (leads, reviews, calls, customer email replies) may each use a Zapier task. Shorter intervals use more of your Zapier plan.</p>
+              </div>
+            ) : null}
 
             {showEmbed && status.embedId && (
               <div className="min-w-0 overflow-hidden rounded-md border">
@@ -594,7 +629,10 @@ function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind
       <p className="text-sm text-muted-foreground">{capability.description}</p>
       <p className="break-words text-xs text-muted-foreground">Supported: {capability.candidates.map(item => `${item.appName} → ${item.actionName}`).join('; ')}</p>
       {CUSTOMER_TEXT_KEYS.includes(capability.key) && (
-        <p className="text-xs text-muted-foreground">Texts go only to customers who agreed to receive them and end with "Reply STOP to opt out." Replies and STOP requests arrive in your phone app, not GrowthOS. If a customer opts out, mark them do not text on their customer record.</p>
+        <p className="text-xs text-muted-foreground">Texts go only to customers who agreed to receive them and end with "Reply STOP to opt out." Replies and STOP requests arrive in your phone app. Set up "Log customer text replies and opt-outs" so GrowthOS records STOPs too; until then, mark a customer who opts out do not text on their record.</p>
+      )}
+      {CUSTOMER_EMAIL_KEYS.includes(capability.key) && (
+        <p className="text-xs text-muted-foreground">Sends from your own mailbox as plain text, only to customers who can be emailed. "Accepted" means your mail app took the message, not that it was delivered. Replies arrive in your mailbox; customer email reply logging can record them here.</p>
       )}
       <p className="text-xs text-muted-foreground">{!capability.binding ? 'Select and configure a supported action to set up this flow.' : !configured ? 'Required settings are missing. Save a complete binding before choosing a policy.' : capability.policy.mode === 'off' ? 'Configured · Off. Choose a policy to allow this flow.' : capability.policy.dailyBudget === 0 ? 'Paused · Daily limit is 0.' : 'Configured · Policy enabled. Provider execution has not been verified by this setup.'}</p>
       <div className="flex flex-wrap items-end gap-3">

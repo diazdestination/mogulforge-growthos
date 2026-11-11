@@ -25,7 +25,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Estimate status & follow-up",
         "stage": "workspace",
-        "reality": "Track drafts, estimates awaiting the customer's answer and decisions. Changing a status does not contact a customer; emailing an estimate is a separate step your team previews and confirms from a connected mailbox."
+        "reality": "Track drafts, estimates awaiting the customer's answer and decisions. Changing a status does not contact a customer; emailing an estimate is a separate step your team previews and confirms from a connected mailbox. A draft can also be emailed from your own Gmail or Outlook connected through Zapier, after your approval."
       },
       {
         "title": "Returning-customer estimates",
@@ -89,12 +89,12 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Accounting export",
         "stage": "setup",
-        "reality": "Send an issued invoice to QuickBooks Online or Xero through your own Zapier connection. Drafts are never exported. The connection starts switched off; with approval on, an authorized staff member approves each export."
+        "reality": "Send an issued invoice, and each payment recorded against it, to QuickBooks Online or Xero through your own Zapier connection. Drafts are never exported. The connection starts switched off; with approval on, an authorized staff member approves each export."
       },
       {
         "title": "Invoice email delivery",
         "stage": "setup",
-        "reality": "Each invoice keeps its delivery history, and the delivery worklist shows failed, pending and uncertain attempts. Sending requires an approved mailbox, a previewed recipient and company delivery setup; uncertain sends are not retried automatically."
+        "reality": "Each invoice keeps its delivery history, and the delivery worklist shows failed, pending and uncertain attempts. Sending requires an approved mailbox, a previewed recipient and company delivery setup; uncertain sends are not retried automatically. You can instead email an issued invoice from your own Gmail or Outlook through Zapier; each invoice uses one path, not both."
       },
       {
         "title": "Exceptions & audit history",
@@ -180,7 +180,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Call & callback review",
         "stage": "workspace",
-        "reality": "Review call records and callback outcomes, assign staff follow-up, and connect reviewed call details to an opportunity once the customer’s need is confirmed."
+        "reality": "Review call records and callback outcomes, assign staff follow-up, and connect reviewed call details to an opportunity once the customer’s need is confirmed. With your phone app connected through Zapier, customer text replies are logged for follow-up and STOP replies stop GrowthOS texts to that number."
       },
       {
         "title": "Missed-call callbacks",
@@ -254,12 +254,12 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Marketplace leads & reviews",
         "stage": "setup",
-        "reality": "Through Zapier, new leads from Facebook Lead Ads, Housecall Pro or Jobber become opportunities once each, and new Google or Facebook reviews become follow-up tasks, with one- and two-star reviews marked high priority. SCOUT only reads these connections; it never posts a review reply."
+        "reality": "Through Zapier, new leads from Facebook Lead Ads, Housecall Pro or Jobber become opportunities once each, and new Google or Facebook reviews become follow-up tasks, with one- and two-star reviews marked high priority. Customer email replies from a mailbox connected through Zapier are logged on the customer record with a follow-up task; mail from unknown senders is ignored. SCOUT only reads these connections; it never posts a review reply."
       },
       {
         "title": "Consented outreach",
         "stage": "setup",
-        "reality": "Campaign and delivery controls require approved providers, consent and company setup before customer contact. Your team reviews the action."
+        "reality": "Campaign and delivery controls require approved providers, consent and company setup before customer contact. Your team reviews the action. A review request can be texted from your own number once per finished visit or job, only to customers who agreed to texts."
       }
     ]
   }

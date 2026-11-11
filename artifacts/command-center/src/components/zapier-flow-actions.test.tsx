@@ -7,7 +7,10 @@ const calendar = capability('appt.calendar.create_event');
 const invoice = capability('invo.accounting.create_invoice');
 const crew = capability('sched.sms.send', 'approve', { crew_phone_tech: '+15555550123' });
 const records = (url: string) => {
-  if (url === '/api/v1/appointments') return [{ id: 'visit', leadLabel: 'Morgan Lee', type: 'inspection', status: 'confirmed', scheduledStart: '2035-07-01T14:00:00Z' }];
+  if (url === '/api/v1/appointments') return [{ id: 'visit', leadLabel: 'Morgan Lee', type: 'inspection', status: 'confirmed', scheduledStart: '2035-07-01T14:00:00Z' }, { id: 'done-visit', leadLabel: 'Avery Stone', type: 'repair_visit', status: 'completed', scheduledStart: '2035-06-01T14:00:00Z' }];
+  if (url === '/api/v1/estimates?status=draft&limit=100') return [{ id: 'est', title: 'Roof estimate', status: 'draft', leadLabel: 'Morgan Lee' }, { id: 'sent-est', title: 'Old estimate', status: 'sent', leadLabel: 'Sent customer' }];
+  if (url === '/api/v1/projects?status=completed&limit=100') return [{ id: 'job', name: 'Kitchen remodel', status: 'completed', leadLabel: 'Avery Stone' }];
+  if (url === '/api/v1/invoices/invoice') return { id: 'invoice', allocations: [{ id: 'pay-1', kind: 'payment', amountCents: 50000, occurredAt: '2035-07-02T14:00:00Z', sourceReference: 'check-77', reversedAt: null }, { id: 'pay-2', kind: 'payment', amountCents: 1000, occurredAt: '2035-07-02T14:00:00Z', sourceReference: 'bounced', reversedAt: '2035-07-03T14:00:00Z' }] };
   if (url.startsWith('/api/v1/invoices?')) return { items: [{ id: 'invoice', customerName: 'Morgan Lee', invoiceNumber: 'INV-001', status: 'issued', issuedAt: '2035-07-01T14:00:00Z' }, { id: 'draft', customerName: 'Draft customer', status: 'draft' }], page: 0, total: 1, pageSize: 25 };
   if (url === '/api/v1/service-obligations?status=active') return [{ obligation: { id: 'svc', status: 'active', equipmentLabel: 'Heat pump', dueAt: '2035-07-10T00:00:00Z' }, contact: { firstName: 'Morgan', lastName: 'Lee' } }];
   if (url === '/api/v1/users') return [{ id: 'tech', firstName: 'Robin', lastName: 'Crew', isActive: true, operationallyEligible: true }, { id: 'inactive', firstName: 'Inactive', isActive: false, operationallyEligible: false }];
@@ -179,4 +182,67 @@ it('shows a pre-dispatch refusal reason and keeps the text button usable', async
   fireEvent.click(screen.getByRole('button', { name: 'Text appointment reminder' }));
   expect(await screen.findByText(/has not agreed to receive texts/)).toBeTruthy();
   await vi.waitFor(() => expect((screen.getByRole('button', { name: 'Text appointment reminder' }) as HTMLButtonElement).disabled).toBe(false));
+});
+
+it('emails an issued invoice and a draft estimate from the connected mailbox only on click', async () => {
+  const s = setup([capability('invo.email.send'), capability('esti.email.send')]);
+  await screen.findByRole('option', { name: /Morgan Lee · Roof estimate/ });
+  expect(screen.queryByRole('option', { name: /Old estimate/ })).toBeNull();
+  expect(s.fetchMock.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+  fireEvent.change(await screen.findByLabelText('Invoice to email'), { target: { value: 'invoice' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Email invoice from my mailbox' }));
+  expect(await screen.findByText(/Awaiting approval/)).toBeTruthy();
+  expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/invoices/invoice/email', expect.objectContaining({ method: 'POST' }));
+  fireEvent.change(screen.getByLabelText('Draft estimate'), { target: { value: 'est' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Email estimate from my mailbox' }));
+  await vi.waitFor(() => expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/estimates/est/email', expect.objectContaining({ method: 'POST' })));
+});
+
+it('offers review requests only for finished visits and jobs, with the opt-out notice', async () => {
+  const s = setup([capability('scout.sms.review_request')]);
+  expect(screen.getByText(/ends with the opt-out line/)).toBeTruthy();
+  await screen.findByRole('option', { name: /Avery Stone · repair visit/ });
+  expect(screen.queryByRole('option', { name: /Morgan Lee · inspection/ })).toBeNull();
+  fireEvent.change(screen.getByLabelText('Finished visit'), { target: { value: 'done-visit' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Text review request for visit' }));
+  expect(await screen.findByText(/Awaiting approval/)).toBeTruthy();
+  expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/appointments/done-visit/review-request', expect.objectContaining({ method: 'POST' }));
+  await screen.findByRole('option', { name: /Kitchen remodel/ });
+  fireEvent.change(screen.getByLabelText('Finished job'), { target: { value: 'job' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Text review request for job' }));
+  await vi.waitFor(() => expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/projects/job/review-request', expect.objectContaining({ method: 'POST' })));
+});
+
+it('records one unreversed payment against a chosen invoice and holds a conflict with its reason', async () => {
+  const s = setup([capability('invo.accounting.record_payment')], { error: 'This payment was already sent to your accounting app.', code: 'conflict' });
+  s.fetchMock.mockImplementation(async (url: string, init?: RequestInit) => init?.method === 'POST'
+    ? Response.json({ error: 'This payment was already sent to your accounting app.', code: 'conflict' }, { status: 409 })
+    : Response.json(records(url)));
+  await screen.findByRole('option', { name: /INV-001.*Morgan Lee/ });
+  fireEvent.change(screen.getByLabelText('Paid invoice'), { target: { value: 'invoice' } });
+  await screen.findByRole('option', { name: /500\.00.*check-77/ });
+  expect(screen.queryByRole('option', { name: /bounced/ })).toBeNull();
+  fireEvent.change(screen.getByLabelText('Recorded payment'), { target: { value: 'pay-1' } });
+  const button = screen.getByRole('button', { name: 'Record payment in accounting' });
+  fireEvent.click(button);
+  expect(await screen.findByText(/already sent to your accounting app/)).toBeTruthy();
+  expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/invoices/invoice/receipts/pay-1/accounting', expect.objectContaining({ method: 'POST' }));
+  await vi.waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(true));
+});
+
+it('logs customer email replies on explicit request and reports the counts', async () => {
+  const s = setup([capability('scout.inbox.list', 'auto')], { execution: { state: 'succeeded' }, received: 3, created: 1, skipped: 0, ignored: 2 });
+  expect(screen.getByText(/never acted on/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Log customer email replies' }));
+  expect(await screen.findByText(/3 received · 1 created · 0 skipped/)).toBeTruthy();
+  expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/scout/inbox', expect.objectContaining({ method: 'POST' }));
+});
+
+it('logs text replies and opt-outs from the contractor number on explicit request', async () => {
+  const s = setup([capability('callie.sms.inbox.list', 'auto')], { execution: { state: 'succeeded' }, received: 2, created: 1, skipped: 0, ignored: 0, optedOut: 1 });
+  expect(screen.getByText(/record fresh consent before texting again/)).toBeTruthy();
+  expect(screen.queryByText(/Call sync and text-back requests are not available/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Log customer text replies and opt-outs' }));
+  expect(await screen.findByText(/2 received · 1 created · 0 skipped/)).toBeTruthy();
+  expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/callie/sms-replies', expect.objectContaining({ method: 'POST' }));
 });

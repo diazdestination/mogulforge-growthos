@@ -228,4 +228,24 @@ describe('client Zapier setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove phone for Fictional Crew' }));
     expect(screen.queryByText(/Fictional Crew.*14045550100/)).toBeNull();
   });
+  it('changes the automatic sync interval only for managers, from the offered choices', async () => {
+    const polled = { ...status, pollIntervalMinutes: 240, pollIntervalChoices: [60, 240, 1440] };
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.endsWith('/actions')) return response({ actions: liveActions });
+      if (path.endsWith('/capabilities')) return response({ capabilities: [capability] });
+      if (path.includes('/executions?')) return response({ executions: [] });
+      return response(polled);
+    });
+    const view = render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    const select = await screen.findByLabelText('Automatic sync interval') as HTMLSelectElement;
+    expect(select.value).toBe('240');
+    expect(Array.from(select.options).map(option => option.textContent)).toEqual(['Every hour', 'Every 4 hours', 'Every 24 hours']);
+    fireEvent.change(select, { target: { value: '60' } });
+    await waitFor(() => expect(calls('/poll-interval')).toHaveLength(1));
+    expect(calls('/poll-interval')[0]![1]).toMatchObject({ method: 'PUT', body: JSON.stringify({ minutes: 60 }) });
+    view.unmount();
+    render(<ZapierConnectedAppsCard signUp={signUp} canManage={false} />);
+    expect(((await screen.findByLabelText('Automatic sync interval')) as HTMLSelectElement).disabled).toBe(true);
+  });
 });
