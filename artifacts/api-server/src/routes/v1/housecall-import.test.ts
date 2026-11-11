@@ -6,7 +6,7 @@ import { db, organizationsTable, usersTable } from "@workspace/db";
 import app from "../../app";
 import { createSession } from "../../lib/auth";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
-import { hcpJobsCsv, hcpJobsMapping } from "../../test-helpers/housecall-fixtures";
+import { hcpEstimatesCsv, hcpEstimatesMapping, hcpJobsCsv, hcpJobsMapping } from "../../test-helpers/housecall-fixtures";
 
 let server: Server, base: string;
 const orgs: string[] = [];
@@ -48,6 +48,23 @@ describe("Housecall Pro import HTTP", () => {
     const bad = await post(owner, "/jobs", { ...file, dryRun: true, mapping: { email: 11 } });
     expect(bad.status).toBe(400);
     expect(await bad.json()).toMatchObject({ code: "hcp_mapping_invalid" });
+  });
+
+  it("previews an estimates report for staff with CRM write access and refuses viewers", async () => {
+    vi.stubEnv("APP_ORIGIN", "http://localhost:3001");
+    const body = {
+      csv: hcpEstimatesCsv([{ "Invoice": "9", "HCP Id": "est_9", "Email": "nobody@example.invalid" }]), fileName: "estimates.csv",
+      mapping: hcpEstimatesMapping(), exportedOn: "2026-10-31", timeZone: "America/New_York", openEstimatesAre: "sent", dryRun: true,
+    };
+    const res = await post(await session("office"), "/estimates", body);
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toMatchObject({ dryRun: true, totalRows: 1, openEstimates: 0, unmatched: [expect.objectContaining({ jobNumber: "9" })] });
+    expect((await post(await session("viewer"), "/estimates", body)).status).toBe(403);
+    const { openEstimatesAre: _unused, ...noStatus } = body;
+    const refused = await post(await session("owner"), "/estimates", noStatus);
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({ code: "hcp_mapping_invalid" });
   });
 
   it("holds invoice approvals to an owner/admin session in the trusted app", async () => {

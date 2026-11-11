@@ -5,6 +5,500 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type CustomerWorkspaceHeaderContact = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  preferredContactMethod: string | null;
+  doNotContact: boolean;
+  doNotContactEmail: boolean;
+  doNotContactSms: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CustomerWorkspaceHeaderPermissions = {
+  canWrite: boolean;
+  canReadInvoices: boolean;
+};
+
+export type CustomerWorkspaceHeaderAvailableSectionsItem = typeof CustomerWorkspaceHeaderAvailableSectionsItem[keyof typeof CustomerWorkspaceHeaderAvailableSectionsItem];
+
+
+export const CustomerWorkspaceHeaderAvailableSectionsItem = {
+  properties: 'properties',
+  appointments: 'appointments',
+  services: 'services',
+  leads: 'leads',
+  projects: 'projects',
+  estimates: 'estimates',
+  invoices: 'invoices',
+  tasks: 'tasks',
+  activity: 'activity',
+} as const;
+
+export interface CustomerWorkspaceHeader {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  contact: CustomerWorkspaceHeaderContact;
+  permissions: CustomerWorkspaceHeaderPermissions;
+  /** @maxItems 9 */
+  availableSections: CustomerWorkspaceHeaderAvailableSectionsItem[];
+}
+
+export type CustomerWorkspacePage = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'properties';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+  kind: 'property';
+  createdAt: string;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'appointments';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'appointment';
+  type: 'inspection' | 'estimate_review' | 'production' | 'final_walkthrough' | 'other';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  updatedAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'services';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'service';
+  serviceKind: 'warranty_check' | 'maintenance' | 'service_plan';
+  equipmentLabel: string;
+  status: 'active' | 'completed' | 'cancelled';
+  dueAt: string;
+  completedAt: string | null;
+  coverageStartsOn: string | null;
+  coverageEndsOn: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  occurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  predecessorObligationId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  taskId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'leads';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'lead';
+  status: 'new' | 'ai_qualified' | 'contact_attempted' | 'inspection_scheduled' | 'inspection_completed' | 'estimate_preparing' | 'estimate_sent' | 'claim_pending' | 'follow_up' | 'won' | 'production_scheduled' | 'in_progress' | 'final_walkthrough' | 'completed' | 'review_requested' | 'nurture' | 'lost';
+  urgency: 'low' | 'normal' | 'high' | 'emergency';
+  serviceType: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'projects';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'project';
+  name: string;
+  status: 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  completedAt: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  workVersion?: number | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'estimates';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'estimate';
+  title: string;
+  status: 'draft' | 'sent' | 'accepted' | 'declined';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  workVersion?: number | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'invoices';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'invoice';
+  invoiceNumber: string | null;
+  title: string;
+  status: 'draft' | 'issued' | 'void';
+  issuedAt: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId?: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  projectId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'tasks';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'task';
+  title: string;
+  status: 'open' | 'in_progress' | 'done' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'emergency';
+  dueAt: string | null;
+  completedAt: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'activity';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'activity';
+  category: 'note' | 'lead' | 'appointment' | 'service' | 'task' | 'communication' | 'invoice';
+  label: 'Note recorded' | 'Opportunity updated' | 'Visit updated' | 'Service updated' | 'Task updated' | 'Communication event recorded' | 'Customer response recorded' | 'Invoice updated' | 'Housecall Pro job imported' | 'Housecall Pro estimate imported';
+  occurredAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+})[];
+};
+
+export type CustomerWorkspaceAppointmentDetailAppointmentKind = typeof CustomerWorkspaceAppointmentDetailAppointmentKind[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentKind];
+
+
+export const CustomerWorkspaceAppointmentDetailAppointmentKind = {
+  appointment: 'appointment',
+} as const;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentType = typeof CustomerWorkspaceAppointmentDetailAppointmentType[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentType];
+
+
+export const CustomerWorkspaceAppointmentDetailAppointmentType = {
+  inspection: 'inspection',
+  estimate_review: 'estimate_review',
+  production: 'production',
+  final_walkthrough: 'final_walkthrough',
+  other: 'other',
+} as const;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentStatus = typeof CustomerWorkspaceAppointmentDetailAppointmentStatus[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentStatus];
+
+
+export const CustomerWorkspaceAppointmentDetailAppointmentStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentProperty = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentOwner = {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+
+export type CustomerWorkspaceAppointmentDetailAppointment = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: CustomerWorkspaceAppointmentDetailAppointmentKind;
+  type: CustomerWorkspaceAppointmentDetailAppointmentType;
+  status: CustomerWorkspaceAppointmentDetailAppointmentStatus;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  updatedAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  property: CustomerWorkspaceAppointmentDetailAppointmentProperty;
+  owner: CustomerWorkspaceAppointmentDetailAppointmentOwner;
+};
+
+export type CustomerWorkspaceAppointmentDetailPermissions = {
+  canWrite: boolean;
+};
+
+export interface CustomerWorkspaceAppointmentDetail {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  appointment: CustomerWorkspaceAppointmentDetailAppointment;
+  permissions: CustomerWorkspaceAppointmentDetailPermissions;
+}
+
 export type SchedulingConflictExplanationBasis = typeof SchedulingConflictExplanationBasis[keyof typeof SchedulingConflictExplanationBasis];
 
 
@@ -3280,500 +3774,6 @@ export interface CustomerWorkEstimate {
   acceptedAt: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export type CustomerWorkspaceHeaderContact = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  firstName: string;
-  lastName: string | null;
-  email: string | null;
-  phone: string | null;
-  preferredContactMethod: string | null;
-  doNotContact: boolean;
-  doNotContactEmail: boolean;
-  doNotContactSms: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type CustomerWorkspaceHeaderPermissions = {
-  canWrite: boolean;
-  canReadInvoices: boolean;
-};
-
-export type CustomerWorkspaceHeaderAvailableSectionsItem = typeof CustomerWorkspaceHeaderAvailableSectionsItem[keyof typeof CustomerWorkspaceHeaderAvailableSectionsItem];
-
-
-export const CustomerWorkspaceHeaderAvailableSectionsItem = {
-  properties: 'properties',
-  appointments: 'appointments',
-  services: 'services',
-  leads: 'leads',
-  projects: 'projects',
-  estimates: 'estimates',
-  invoices: 'invoices',
-  tasks: 'tasks',
-  activity: 'activity',
-} as const;
-
-export interface CustomerWorkspaceHeader {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  contact: CustomerWorkspaceHeaderContact;
-  permissions: CustomerWorkspaceHeaderPermissions;
-  /** @maxItems 9 */
-  availableSections: CustomerWorkspaceHeaderAvailableSectionsItem[];
-}
-
-export type CustomerWorkspacePage = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'properties';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-  kind: 'property';
-  createdAt: string;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'appointments';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'appointment';
-  type: 'inspection' | 'estimate_review' | 'production' | 'final_walkthrough' | 'other';
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  scheduledStart: string;
-  scheduledEnd: string | null;
-  updatedAt: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'services';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'service';
-  serviceKind: 'warranty_check' | 'maintenance' | 'service_plan';
-  equipmentLabel: string;
-  status: 'active' | 'completed' | 'cancelled';
-  dueAt: string;
-  completedAt: string | null;
-  coverageStartsOn: string | null;
-  coverageEndsOn: string | null;
-  /**
-     * @minimum 0
-     * @maximum 9007199254740991
-     */
-  occurrenceIndex: number;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  predecessorObligationId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  taskId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  appointmentId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'leads';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'lead';
-  status: 'new' | 'ai_qualified' | 'contact_attempted' | 'inspection_scheduled' | 'inspection_completed' | 'estimate_preparing' | 'estimate_sent' | 'claim_pending' | 'follow_up' | 'won' | 'production_scheduled' | 'in_progress' | 'final_walkthrough' | 'completed' | 'review_requested' | 'nurture' | 'lost';
-  urgency: 'low' | 'normal' | 'high' | 'emergency';
-  serviceType: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'projects';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'project';
-  name: string;
-  status: 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
-  scheduledStart: string | null;
-  scheduledEnd: string | null;
-  completedAt: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  customerWorkId?: string | null;
-  /**
-     * @minimum 0
-     * @maximum 9007199254740991
-     * @exclusiveMinimum
-     */
-  workVersion?: number | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  estimateId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'estimates';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'estimate';
-  title: string;
-  status: 'draft' | 'sent' | 'accepted' | 'declined';
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  customerWorkId?: string | null;
-  /**
-     * @minimum 0
-     * @maximum 9007199254740991
-     * @exclusiveMinimum
-     */
-  workVersion?: number | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'invoices';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'invoice';
-  invoiceNumber: string | null;
-  title: string;
-  status: 'draft' | 'issued' | 'void';
-  issuedAt: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  customerWorkId?: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  projectId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  estimateId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'tasks';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'task';
-  title: string;
-  status: 'open' | 'in_progress' | 'done' | 'cancelled';
-  priority: 'low' | 'normal' | 'high' | 'emergency';
-  dueAt: string | null;
-  completedAt: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'activity';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'activity';
-  category: 'note' | 'lead' | 'appointment' | 'service' | 'task' | 'communication' | 'invoice';
-  label: 'Note recorded' | 'Opportunity updated' | 'Visit updated' | 'Service updated' | 'Task updated' | 'Communication event recorded' | 'Customer response recorded' | 'Invoice updated';
-  occurredAt: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-})[];
-};
-
-export type CustomerWorkspaceAppointmentDetailAppointmentKind = typeof CustomerWorkspaceAppointmentDetailAppointmentKind[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentKind];
-
-
-export const CustomerWorkspaceAppointmentDetailAppointmentKind = {
-  appointment: 'appointment',
-} as const;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentType = typeof CustomerWorkspaceAppointmentDetailAppointmentType[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentType];
-
-
-export const CustomerWorkspaceAppointmentDetailAppointmentType = {
-  inspection: 'inspection',
-  estimate_review: 'estimate_review',
-  production: 'production',
-  final_walkthrough: 'final_walkthrough',
-  other: 'other',
-} as const;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentStatus = typeof CustomerWorkspaceAppointmentDetailAppointmentStatus[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentStatus];
-
-
-export const CustomerWorkspaceAppointmentDetailAppointmentStatus = {
-  scheduled: 'scheduled',
-  confirmed: 'confirmed',
-  completed: 'completed',
-  cancelled: 'cancelled',
-  no_show: 'no_show',
-} as const;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentProperty = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentOwner = {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-
-export type CustomerWorkspaceAppointmentDetailAppointment = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: CustomerWorkspaceAppointmentDetailAppointmentKind;
-  type: CustomerWorkspaceAppointmentDetailAppointmentType;
-  status: CustomerWorkspaceAppointmentDetailAppointmentStatus;
-  scheduledStart: string;
-  scheduledEnd: string | null;
-  updatedAt: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  property: CustomerWorkspaceAppointmentDetailAppointmentProperty;
-  owner: CustomerWorkspaceAppointmentDetailAppointmentOwner;
-};
-
-export type CustomerWorkspaceAppointmentDetailPermissions = {
-  canWrite: boolean;
-};
-
-export interface CustomerWorkspaceAppointmentDetail {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  appointment: CustomerWorkspaceAppointmentDetailAppointment;
-  permissions: CustomerWorkspaceAppointmentDetailPermissions;
 }
 
 export type WorkdayAssetPageItemsItemCategory = typeof WorkdayAssetPageItemsItemCategory[keyof typeof WorkdayAssetPageItemsItemCategory];
@@ -17364,6 +17364,15 @@ export type AuthorizationSessionHeaderParameter = string;
  */
 export type PortalTokenHeaderParameter = string;
 
+export type GetCustomerWorkspaceSectionParams = {
+/**
+ * @minLength 1
+ * @maxLength 2048
+ * @pattern ^[A-Za-z0-9_-]+$
+ */
+cursor?: string;
+};
+
 export type GetCallieSchedulingContextParams = {
 appointmentType: GetCallieSchedulingContextAppointmentType;
 /**
@@ -17388,15 +17397,6 @@ export type UpdateCustomerWorkProject409 = CustomerWorkProjectUnavailable | {
 export type CreateCustomerWorkProject409 = CustomerWorkProjectUnavailable | {
   error: string;
   code?: string;
-};
-
-export type GetCustomerWorkspaceSectionParams = {
-/**
- * @minLength 1
- * @maxLength 2048
- * @pattern ^[A-Za-z0-9_-]+$
- */
-cursor?: string;
 };
 
 export type GetWorkdayAssetsParams = {
@@ -17527,7 +17527,20 @@ offset?: number;
  * When true, return only leads where the most recent portal message is newer than the most recent team reply.
  */
 hasUnreadPortalMessage?: boolean;
+/**
+ * Completed or lost jobs imported from Housecall Pro are history. hide (default) leaves them out, include shows everything, only shows just that history.
+ */
+importedHistory?: ListLeadsImportedHistory;
 };
+
+export type ListLeadsImportedHistory = typeof ListLeadsImportedHistory[keyof typeof ListLeadsImportedHistory];
+
+
+export const ListLeadsImportedHistory = {
+  hide: 'hide',
+  include: 'include',
+  only: 'only',
+} as const;
 
 export type ListEstimatesParams = {
 leadId?: string;

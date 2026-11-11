@@ -171,7 +171,23 @@ confirmation, is idempotent on re-run, is tenant-scoped and audited, and contact
   scheduled. Anything else open is history flagged "needs scheduling". Rows that match no
   customer, or more than one, are listed and skipped (customers are never created from a
   jobs file). A re-run skips identical jobs and updates a job that moved forward in HCP
-  only when GrowthOS has not edited it.
+  only when GrowthOS has not edited it. Completed and lost imported jobs are history:
+  `GET /leads` hides them unless `importedHistory=include|only`, and the pipeline's
+  "Show imported history" toggle (`?imported=1`) includes them; the customer timeline
+  always shows them.
+- **Estimates** (`POST /housecall-import/estimates`, `crm.write`, preview/confirm like
+  jobs): open estimates become an imported opportunity (`externalOpportunityId =
+  estimate:<HCP Id>`, `importedHistory.externalEstimateId`) in `estimate_sent` or
+  `estimate_preparing`, with one native estimate (`sent` or `draft`, created through the
+  same saved-state history and `estimate.created` audit as a native estimate) and a
+  read-only `imported_estimate` timeline record. ESTI's estimate workspace and SCOUT's
+  stalled-estimate follow-up pick them up from the lead status and the HCP created date;
+  `sentAt` stays empty because the export has no send date. Approved, declined and
+  closed estimates are timeline history only (no opportunity, no estimate). Amount (tax
+  included, as in the jobs report) becomes one line item; without an amount the estimate
+  is $0 and flagged. A future estimate visit is flagged to book, not put on the calendar.
+  Re-runs skip identical rows; a row that changed after import is listed and the GrowthOS
+  record kept. Nothing is sent.
 - **Invoices/open balances** (`POST /housecall-import/invoices/preview|commit`,
   `settings.manage`, same trusted-origin/no-API-key guard as `/financial-migrations`):
   from the same jobs file, mapped into normalized financial migration v1
@@ -193,12 +209,19 @@ Header sources. **Confirmed** — jobs report (47 columns: `Invoice`/`Invoice Nu
 `Due`, `Discount`, `Tax`, `Job Tags`, `Notes`, `Employee`, `Job Status`, `Finished`,
 `Invoice Sent`, `Tip Amount`, `Online Booking Source`, …) from help.housecallpro.com
 "Exported report breakdown" (article 2999685) and ServiceTitan's "Export your Housecall Pro
-data"; customers export (24 columns: `First Name`, `Last Name`, `Mobile Number`, `Email`,
+data"; estimates report (22 columns, `Open Estimates` > `See all estimates` > all table
+columns with the `Estimate` column switched to `Invoice`: `Invoice`, `HCP Id`, `Created At`,
+`Date`, `End Time`, durations, `Customer`, `First Name`, `Last Name`, `Email`, `Company`,
+`Mobile Phone`, `Home Phone`, `Customer Tag`, `Address`, `Street`, `Street Line 2`, `City`,
+`State`, `Zip`) from the same ServiceTitan page and HCP article 4671115 (steps only). It
+has no status column, so staff state whether the open estimates were sent; unknown
+status wording is listed, never guessed; customers export (24 columns: `First Name`, `Last Name`, `Mobile Number`, `Email`,
 `Company`, `Tags`, `Notes`, `ID`, `Address_1 Street Line 1` … `Address_1 Postal Code`, twice)
 from the ServiceTitan page (HCP's own "Export customer list", article 2847823, documents only
 the steps). **Assumed** (aliases only, staff confirm): customer ID or lead source columns in
 the jobs report, a separate invoices export (HCP documents none; invoices are the jobs
-report), estimates import (not built), date/money text formats, Payment History format,
+report), any status, amount, tax, description or employee column in the estimates
+report, date/money text formats, Payment History format,
 HCP status wording (complete rated/unrated, scheduled, unscheduled, in progress, canceled;
 unknown values are kept as history and flagged), and the second address block being a
 repeat of the `Address_1` names. Dates are read in the company time zone staff choose.

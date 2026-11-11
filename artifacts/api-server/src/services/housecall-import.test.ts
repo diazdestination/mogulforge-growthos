@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   activitiesTable,
   appointmentsTable,
+  estimatesTable,
   auditEventsTable,
   contactsTable,
   db,
@@ -16,14 +17,22 @@ import {
   usersTable,
 } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
-import { HCP_CUSTOMERS_HEADER, csv, hcpJobsCsv, hcpJobsMapping, type HcpJobRow } from "../test-helpers/housecall-fixtures";
+import {
+  HCP_CUSTOMERS_HEADER, csv, hcpEstimatesCsv, hcpEstimatesMapping, hcpJobsCsv, hcpJobsMapping, type HcpEstimateRow, type HcpJobRow,
+} from "../test-helpers/housecall-fixtures";
+import { buildRevenueRecoveryBriefing } from "./bie";
 import { importLeads } from "./reactivation";
 import { getInvoice } from "./invoices";
+import { listLeads } from "./crm";
+import { getCustomerWorkspaceSection } from "./customer-workspace";
 import {
+  HCP_ESTIMATE_ACTIVITY,
   HCP_JOB_ACTIVITY,
+  classifyHcpEstimateStatus,
   classifyHcpStatus,
   commitHousecallInvoices,
   exportCutoff,
+  importHousecallEstimates,
   importHousecallJobs,
   parseHcpDate,
   parseHcpMoney,
@@ -185,6 +194,24 @@ describe("Move from Housecall Pro", () => {
     expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, a.org))).toHaveLength(1);
   });
 
+  it("keeps imported history out of the default pipeline but on the customer timeline", async () => {
+    const [native] = await db.insert(leadsTable).values({ organizationId: a.org, contactId: (await db.select().from(contactsTable).where(eq(contactsTable.organizationId, a.org)))[0]!.id, status: "completed" }).returning();
+    const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
+    const hcp = (await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, a.org), eq(leadsTable.importSourceKey, "housecall-pro"))));
+    const history = hcp.filter((l) => l.status === "completed" || l.status === "lost").map((l) => l.id).sort();
+    expect(history).toHaveLength(5);
+    const shown = ids(await listLeads(a.org));
+    expect(shown).toContain(native!.id);
+    expect(shown.filter((id) => history.includes(id))).toEqual([]);
+    expect(shown).toEqual(expect.arrayContaining(hcp.filter((l) => !history.includes(l.id)).map((l) => l.id)));
+    expect(ids(await listLeads(a.org, { importedHistory: "only" })).sort()).toEqual(history);
+    expect(ids(await listLeads(a.org, { importedHistory: "include" }))).toEqual(expect.arrayContaining([...history, native!.id]));
+    await db.delete(leadsTable).where(eq(leadsTable.id, native!.id));
+    const done = hcp.find((l) => l.externalOpportunityId === `job_1001_${tag}`)!;
+    const timeline = await getCustomerWorkspaceSection(a.org, a.actor, done.contactId, { section: "activity" });
+    expect(timeline.items).toEqual(expect.arrayContaining([expect.objectContaining({ leadId: done.id, label: "Housecall Pro job imported" })]));
+  });
+
   it("refuses missing columns and lists bad rows instead of guessing", async () => {
     const { jobId: _drop, ...noId } = hcpJobsMapping();
     await expect(importHousecallJobs(a.org, a.actor, { ...jobsRequest(tag, true), mapping: noId })).rejects.toMatchObject({ code: "hcp_mapping_invalid" });
@@ -260,5 +287,114 @@ describe("Move from Housecall Pro", () => {
     expect(kept.updatedJobs).toBe(0);
     expect(kept.problems).toEqual([expect.objectContaining({ jobNumber: "1005", reason: expect.stringMatching(/edited in GrowthOS/) })]);
     expect((await db.select().from(leadsTable).where(eq(leadsTable.id, lead!.id)))[0]!.summary).toBe("Edited by staff");
+  });
+});
+
+describe("Housecall Pro estimates", () => {
+  let a: { org: string; actor: string }, b: { org: string; actor: string };
+  const tag = randomUUID().slice(0, 8);
+  const row = (n: string, email: string, extra: HcpEstimateRow = {}): HcpEstimateRow => ({
+    "Invoice": n, "HCP Id": `est_${n}_${tag}`, "Created At": "2026-09-01 10:00", "Customer": "Synthetic", "Email": email, ...extra,
+  });
+  const request = (rows: HcpEstimateRow[], dryRun: boolean, extra = false, more: Record<string, unknown> = {}) => ({
+    csv: hcpEstimatesCsv(rows, extra), fileName: "estimates.csv", mapping: hcpEstimatesMapping(extra), exportedOn: "2026-10-31", timeZone: TZ, dryRun, ...more,
+  });
+  const now = new Date("2026-11-11T15:00:00Z");
+  beforeAll(async () => {
+    a = await company("Synthetic Estimates A");
+    b = await company("Synthetic Estimates B");
+    await importCustomers(a.org, a.actor, tag);
+  });
+
+  it("recognizes estimate decisions and never guesses an unknown status", () => {
+    expect(classifyHcpEstimateStatus("Approved")).toBe("approved");
+    expect(classifyHcpEstimateStatus("Option declined")).toBe("declined");
+    expect(classifyHcpEstimateStatus("Not sent")).toBe("draft");
+    expect(classifyHcpEstimateStatus("Awaiting response")).toBe("sent");
+    expect(classifyHcpEstimateStatus("Expired")).toBe("closed");
+    expect(classifyHcpEstimateStatus("")).toBe("blank");
+    expect(classifyHcpEstimateStatus("purple")).toBeNull();
+  });
+
+  it("imports the published Open Estimates layout as follow-up-ready estimates, only when staff say they were sent", async () => {
+    const rows = [
+      row("2001", `avery-${tag}@example.invalid`, { "Street": "12 Lake Rd", "City": "Dawsonville", "State": "GA", "Zip": "30534", "Customer Tag": "VIP" }),
+      row("2002", "", { "Mobile Phone": "470-555-0102", "Date": "2030-01-05 9:00 AM", "End Time": "2030-01-05 10:00 AM" }),
+      row("2003", `stranger-${tag}@example.invalid`),
+    ];
+    await expect(importHousecallEstimates(a.org, a.actor, request(rows, true), now)).rejects.toMatchObject({ code: "hcp_mapping_invalid" });
+    const preview = await importHousecallEstimates(a.org, a.actor, request(rows, true, false, { openEstimatesAre: "sent" }), now);
+    expect(preview).toMatchObject({ dryRun: true, totalRows: 3, openEstimates: 2, sent: 2, visitsToBook: 1, missingAmounts: 2, propertiesCreated: 0 });
+    expect(preview.unmatched).toEqual([expect.objectContaining({ jobNumber: "2003" })]);
+    expect(await db.select().from(estimatesTable).where(eq(estimatesTable.organizationId, a.org))).toHaveLength(0);
+    expect(await db.select().from(activitiesTable).where(and(eq(activitiesTable.organizationId, a.org), eq(activitiesTable.type, HCP_ESTIMATE_ACTIVITY)))).toHaveLength(0);
+
+    const done = await importHousecallEstimates(a.org, a.actor, request(rows, false, false, { openEstimatesAre: "sent" }), now);
+    expect(done).toMatchObject({ dryRun: false, openEstimates: 2, sent: 2 });
+    const leads = await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, a.org), eq(leadsTable.importSourceKey, "housecall-pro")));
+    expect(leads.map((l) => [l.externalOpportunityId, l.status]).sort()).toEqual([[`estimate:est_2001_${tag}`, "estimate_sent"], [`estimate:est_2002_${tag}`, "estimate_sent"]]);
+    const avery = leads.find((l) => l.externalOpportunityId === `estimate:est_2001_${tag}`)!;
+    expect(avery.importedHistory).toMatchObject({ externalEstimateId: `est_2001_${tag}`, originalCreatedAt: "2026-09-01T14:00:00.000Z" });
+    expect(avery.propertyId).not.toBeNull();
+    const estimates = await db.select().from(estimatesTable).where(eq(estimatesTable.organizationId, a.org));
+    expect(estimates).toHaveLength(2);
+    expect(estimates.every((e) => e.status === "sent" && e.sentAt === null && e.leadId !== null && e.totalCents === 0)).toBe(true);
+    // Nothing is queued for a customer; the native saved-state history is kept.
+    expect(await db.select().from(scheduledActionsTable).where(eq(scheduledActionsTable.organizationId, a.org))).toHaveLength(0);
+    const audits = await db.select().from(auditEventsTable).where(eq(auditEventsTable.organizationId, a.org));
+    expect(audits.filter((e) => e.action === "estimate.created")).toHaveLength(2);
+    expect(audits.filter((e) => e.action === "estimate.saved_state")).toHaveLength(2);
+    expect(audits.filter((e) => e.action === "housecall.estimates_imported")).toHaveLength(1);
+
+    // Linked to the customer, on the timeline, and picked up as follow-up.
+    const workspace = await getCustomerWorkspaceSection(a.org, a.actor, avery.contactId!, { section: "estimates" });
+    expect(workspace.items).toEqual([expect.objectContaining({ leadId: avery.id, status: "sent", title: "Housecall Pro estimate 2001" })]);
+    const timeline = await getCustomerWorkspaceSection(a.org, a.actor, avery.contactId!, { section: "activity" });
+    expect(timeline.items).toEqual(expect.arrayContaining([expect.objectContaining({ leadId: avery.id, label: "Housecall Pro estimate imported" })]));
+    expect((await listLeads(a.org)).map((l) => l.id)).toContain(avery.id);
+    const briefing = await buildRevenueRecoveryBriefing(a.org);
+    expect(briefing.opportunities.find((o) => o.kind === "stalled_estimate")?.leadIds).toEqual(expect.arrayContaining(leads.map((l) => l.id)));
+
+    // Re-running the same file changes nothing.
+    const again = await importHousecallEstimates(a.org, a.actor, request(rows, false, false, { openEstimatesAre: "sent" }), now);
+    expect(again).toMatchObject({ openEstimates: 0, alreadyImported: 2 });
+    expect(await db.select().from(estimatesTable).where(eq(estimatesTable.organizationId, a.org))).toHaveLength(2);
+  });
+
+  it("keeps decided estimates as history only, drafts as drafts, and lists what it cannot place", async () => {
+    const rows = [
+      row("3001", `blake-${tag}@example.invalid`, { "Estimate Status": "Approved", "Amount": "1,200.00" }),
+      row("3002", `blake-${tag}@example.invalid`, { "Estimate Status": "Declined", "Amount": "300.00" }),
+      row("3003", `casey-${tag}@example.invalid`, { "Estimate Status": "Not sent", "Amount": "$535.00", "Tax": "35.00" }),
+      row("3004", `casey-${tag}@example.invalid`, { "Estimate Status": "purple" }),
+      row("3005", `casey-${tag}@example.invalid`, { "Estimate Status": "Awaiting response", "Amount": "50", "Tax": "60" }),
+    ];
+    const done = await importHousecallEstimates(a.org, a.actor, request(rows, false, true), now);
+    expect(done).toMatchObject({ openEstimates: 1, drafts: 1, decidedHistory: 2, approved: 1, declined: 1 });
+    expect(done.problems.map((p) => p.jobNumber).sort()).toEqual(["3004", "3005"]);
+    const imported = await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, a.org), eq(leadsTable.externalOpportunityId, `estimate:est_3003_${tag}`)));
+    expect(imported).toEqual([expect.objectContaining({ status: "estimate_preparing", estimatedValueCents: 53500 })]);
+    const [draft] = await db.select().from(estimatesTable).where(eq(estimatesTable.leadId, imported[0]!.id));
+    expect(draft).toMatchObject({ status: "draft", subtotalCents: 50000, taxCents: 3500, totalCents: 53500, lineItems: [expect.objectContaining({ quantity: 1, unitPriceCents: 50000 })] });
+    // Decided estimates: no opportunity and no estimate, just customer history.
+    expect(await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, a.org), inArray(leadsTable.externalOpportunityId, [`estimate:est_3001_${tag}`, `estimate:est_3002_${tag}`])))).toHaveLength(0);
+    const history = await db.select().from(activitiesTable).where(and(eq(activitiesTable.organizationId, a.org), eq(activitiesTable.type, HCP_ESTIMATE_ACTIVITY), isNull(activitiesTable.leadId)));
+    expect(history.map((h) => h.title).sort()).toEqual(["Housecall Pro estimate 3001 (approved)", "Housecall Pro estimate 3002 (declined)"]);
+    const timeline = await getCustomerWorkspaceSection(a.org, a.actor, history[0]!.contactId!, { section: "activity" });
+    expect(timeline.items.filter((i) => i.kind === "activity" && i.label === "Housecall Pro estimate imported").length).toBeGreaterThanOrEqual(2);
+
+    // A later export never overwrites what is in GrowthOS.
+    const later = await importHousecallEstimates(a.org, a.actor, request([
+      row("3001", `blake-${tag}@example.invalid`, { "Estimate Status": "Approved", "Amount": "1,200.00" }),
+      row("3003", `casey-${tag}@example.invalid`, { "Estimate Status": "Approved", "Amount": "$535.00", "Tax": "35.00" }),
+    ], false, true), now);
+    expect(later).toMatchObject({ alreadyImported: 1, changedSinceImport: 1, decidedHistory: 0, openEstimates: 0 });
+    expect((await db.select().from(estimatesTable).where(eq(estimatesTable.id, draft!.id)))[0]!.status).toBe("draft");
+
+    // Another company cannot match these customers.
+    const other = await importHousecallEstimates(b.org, b.actor, request(rows, false, true), now);
+    expect(other).toMatchObject({ openEstimates: 0, decidedHistory: 0 });
+    expect(other.unmatched).toHaveLength(3);
+    expect(await db.select().from(estimatesTable).where(eq(estimatesTable.organizationId, b.org))).toHaveLength(0);
   });
 });

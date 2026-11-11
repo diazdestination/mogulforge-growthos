@@ -8,6 +8,7 @@ import {
   contactsTable,
   customerLifecycleTable,
   db,
+  estimatesTable,
   importedOpportunityHistorySchema,
   invoicesTable,
   leadsTable,
@@ -19,6 +20,8 @@ import {
 } from "@workspace/db";
 import { financialMigrationItemsTable } from "../../../../lib/db/src/schema/financial-migration";
 import { recordAudit } from "./audit";
+import { lockCustomerWork } from "./customer-work-lineage";
+import { recordEstimateSavedState } from "./estimate-delivery-history";
 import { lockContractorSchedule } from "./contractor-scheduling";
 import { commitFinancialMigration, previewFinancialMigration } from "./financial-migration";
 import {
@@ -40,6 +43,9 @@ import { CUSTOMER_IMPORTED_ACTION, CsvParseError, parseCsv, propertyAddressKey }
 export const HCP_SOURCE_KEY = "housecall-pro";
 export const HCP_FINANCIAL_SOURCE = { sourceSystem: "housecall_pro", sourceAccount: "jobs-report" } as const;
 export const HCP_JOB_ACTIVITY = "imported_job";
+export const HCP_ESTIMATE_ACTIVITY = "imported_estimate";
+/** Estimates share the source namespace with jobs, so their IDs are prefixed. */
+export const hcpEstimateExternalId = (estimateId: string) => `estimate:${estimateId}`;
 export const MAX_JOB_ROWS = 10_000;
 export const MAX_INVOICES_PER_RUN = 2_000;
 const INVOICES_PER_REVIEW = 50;
@@ -282,7 +288,7 @@ async function loadCustomers(reader: Reader, org: string) {
   const names = new Map(contacts.map((c) => [c.id, [c.firstName, c.lastName].filter(Boolean).join(" ")]));
   return {
     names,
-    match(job: ParsedJob): { contactId: string } | { reason: string } {
+    match(job: { customerId: string | null; email: string | null; phones: string[] }): { contactId: string } | { reason: string } {
       if (job.customerId && byCustomerId.has(job.customerId)) {
         const ids = byCustomerId.get(job.customerId)!;
         if (ids.size === 1) return { contactId: [...ids][0]! };
@@ -294,6 +300,28 @@ async function loadCustomers(reader: Reader, org: string) {
       return { reason: "no GrowthOS customer has this email or phone; import the customer list first, then this file again" };
     },
   };
+}
+
+type PropertyIndex = Map<string, { id: string; key: string }[]>;
+async function loadProperties(reader: Reader, org: string): Promise<PropertyIndex> {
+  const properties = await reader.select({ id: propertiesTable.id, contactId: propertiesTable.contactId, addressLine1: propertiesTable.addressLine1, postalCode: propertiesTable.postalCode })
+    .from(propertiesTable).where(eq(propertiesTable.organizationId, org));
+  const index: PropertyIndex = new Map();
+  for (const p of properties) if (p.contactId) index.set(p.contactId, [...(index.get(p.contactId) ?? []), { id: p.id, key: propertyAddressKey(p.addressLine1, p.postalCode) }]);
+  return index;
+}
+/** The row's service address (created if new), else the customer's only property. A preview creates nothing. */
+async function resolveProperty(tx: Tx, org: string, contactId: string, address: Address | null, index: PropertyIndex, save: boolean) {
+  const owned = index.get(contactId) ?? [];
+  if (!address) return { propertyId: owned.length === 1 ? owned[0]!.id : null, created: false };
+  const key = propertyAddressKey(address.addressLine1, address.postalCode);
+  const found = owned.find((p) => p.key === key)?.id;
+  if (found) return { propertyId: found, created: false };
+  const propertyId = save
+    ? (await tx.insert(propertiesTable).values({ organizationId: org, contactId, ...address }).returning({ id: propertiesTable.id }))[0]!.id
+    : randomUUID();
+  index.set(contactId, [...owned, { id: propertyId, key }]);
+  return { propertyId, created: true };
 }
 
 async function lockAndCheckCompany(tx: Tx, org: string) {
@@ -336,10 +364,7 @@ export async function importHousecallJobs(org: string, actor: string, raw: unkno
     // Same serialization as the CSV customer/lead import.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`lead-import:${org}`}))`);
     const customers = await loadCustomers(tx, org);
-    const properties = await tx.select({ id: propertiesTable.id, contactId: propertiesTable.contactId, addressLine1: propertiesTable.addressLine1, postalCode: propertiesTable.postalCode })
-      .from(propertiesTable).where(eq(propertiesTable.organizationId, org));
-    const propertiesByContact = new Map<string, { id: string; key: string }[]>();
-    for (const p of properties) if (p.contactId) propertiesByContact.set(p.contactId, [...(propertiesByContact.get(p.contactId) ?? []), { id: p.id, key: propertyAddressKey(p.addressLine1, p.postalCode) }]);
+    const propertiesByContact = await loadProperties(tx, org);
     const ids = parsed.jobs.map((j) => j.jobId);
     const existing = new Map<string, typeof leadsTable.$inferSelect>();
     for (let i = 0; i < ids.length; i += 1000) {
@@ -411,17 +436,10 @@ export async function importHousecallJobs(org: string, actor: string, raw: unkno
       // Property: the job's service address, else the customer's only property.
       let propertyId: string | null = prior?.propertyId ?? null;
       if (!prior) {
-        const owned = propertiesByContact.get(contactId) ?? [];
-        if (job.address) {
-          const key = propertyAddressKey(job.address.addressLine1, job.address.postalCode);
-          propertyId = owned.find((p) => p.key === key)?.id ?? null;
-          if (!propertyId) {
-            const [created] = await tx.insert(propertiesTable).values({ organizationId: org, contactId, ...job.address }).returning({ id: propertiesTable.id });
-            propertyId = created!.id;
-            propertiesByContact.set(contactId, [...owned, { id: propertyId, key }]);
-            result.propertiesCreated++;
-          }
-        } else if (owned.length === 1) propertyId = owned[0]!.id;
+        // Jobs previews run inside a rolled-back transaction, so they save the same way.
+        const resolved = await resolveProperty(tx, org, contactId, job.address, propertiesByContact, true);
+        propertyId = resolved.propertyId;
+        if (resolved.created) result.propertiesCreated++;
       }
       let leadId: string;
       if (prior) {
@@ -487,6 +505,313 @@ export async function importHousecallJobs(org: string, actor: string, raw: unkno
         exportedOn: input.exportedOn, timeZone: input.timeZone, totalRows: result.totalRows, newJobs: result.newJobs, updatedJobs: result.updatedJobs,
         alreadyImported: result.alreadyImported, appointmentsCreated: result.appointmentsCreated, propertiesCreated: result.propertiesCreated,
         unmatched: result.unmatched.length, problems: result.problems.length, customerContact: false,
+      },
+    });
+  };
+  try {
+    await db.transaction(work);
+  } catch (error) {
+    if (error instanceof DryRunRollback) return result;
+    const code = (error as { code?: unknown; cause?: { code?: unknown } }).code ?? (error as { cause?: { code?: unknown } }).cause?.code;
+    if (code === "55P03" || code === "57014") throw new HousecallImportError(503, "hcp_import_slow", "Another import is running or the file is too large to finish in time. Nothing was saved. Try again, or import a shorter date range.");
+    throw error;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Estimates → open estimates staff can follow up, decided ones as history
+// ---------------------------------------------------------------------------
+
+export const ESTIMATE_FIELDS = [
+  "estimateId", "estimateNumber", "createdAt", "scheduledStart", "scheduledEnd",
+  "customerName", "firstName", "lastName", "email", "phone", "homePhone",
+  "street", "street2", "city", "state", "postalCode", "customerTags",
+  "status", "amount", "tax", "description", "employees",
+] as const;
+export type EstimateField = (typeof ESTIMATE_FIELDS)[number];
+export const estimatesImportSchema = z.object({
+  csv: fileSchema.csv,
+  fileName: fileSchema.fileName,
+  mapping: z.partialRecord(z.enum(ESTIMATE_FIELDS), z.number().int().min(0).max(255)),
+  exportedOn: fileSchema.exportedOn,
+  timeZone: fileSchema.timeZone,
+  /** Staff answer for open estimates whose status the file does not give. */
+  openEstimatesAre: z.enum(["sent", "draft"]).optional(),
+  dryRun: z.boolean(),
+}).strict();
+
+type EstimateState = "draft" | "sent" | "approved" | "declined" | "closed";
+/** null = not recognized (the row is listed, never guessed); "blank" = no status in the row. */
+export function classifyHcpEstimateStatus(raw: string | null): EstimateState | "blank" | null {
+  const s = (raw ?? "").toLowerCase().replace(/[_-]/g, " ").trim();
+  if (!s) return "blank";
+  if (/declin|reject/.test(s)) return "declined";
+  if (/approv|accept|\bwon\b|signed|convert/.test(s)) return "approved";
+  if (/cancel|archiv|expire|\bvoid|\blost\b|delet/.test(s)) return "closed";
+  if (/not sent|unsent|draft|\bnew\b|created|in progress|scheduled|on my way/.test(s)) return "draft";
+  if (/sent|await|pending|viewed|opened|emailed|texted|submitted|\bopen\b|waiting/.test(s)) return "sent";
+  return null;
+}
+const ESTIMATE_LEAD_STATUS = { sent: "estimate_sent", draft: "estimate_preparing" } as const;
+
+type ParsedEstimate = {
+  rowNo: number; estimateId: string; estimateNumber: string | null; createdAt: Date | null; scheduledStart: Date | null; scheduledEnd: Date | null;
+  customerName: string; email: string | null; phones: string[]; customerId: null; address: Address | null; customerTags: string[];
+  rawStatus: string | null; state: EstimateState; amountCents: number | null; taxCents: number; description: string | null; employees: string[]; fingerprint: string;
+};
+type EstimateProblem = { row: number; jobNumber: string | null; customer: string | null; reason: string };
+
+export function parseEstimatesFile(input: z.output<typeof estimatesImportSchema>) {
+  let all: string[][];
+  try { all = parseCsv(input.csv); } catch (error) {
+    if (error instanceof CsvParseError) throw new HousecallImportError(400, "hcp_csv_invalid", error.message);
+    throw error;
+  }
+  const [header, ...rows] = all;
+  const m = input.mapping;
+  if (!header || rows.length === 0) throw new HousecallImportError(400, "hcp_csv_empty", "No data rows were found in the file.");
+  if (rows.length > MAX_JOB_ROWS) throw new HousecallImportError(400, "hcp_csv_too_large", `The file has more than ${MAX_JOB_ROWS.toLocaleString("en-US")} rows. Export a shorter date range and import each file.`);
+  const used = Object.values(m);
+  if (new Set(used).size !== used.length) throw new HousecallImportError(400, "hcp_mapping_invalid", "Each column can only be used for one field.");
+  if (used.some((i) => i >= header.length)) throw new HousecallImportError(400, "hcp_mapping_invalid", "A chosen column is missing from the file's header.");
+  if (m.estimateId === undefined) throw new HousecallImportError(400, "hcp_mapping_invalid", "Choose the Housecall Pro estimate ID column (HCP Id).");
+  if (m.email === undefined && m.phone === undefined && m.homePhone === undefined)
+    throw new HousecallImportError(400, "hcp_mapping_invalid", "Choose an email or phone column so estimates can be matched to customers.");
+  if (m.status === undefined && !input.openEstimatesAre)
+    throw new HousecallImportError(400, "hcp_mapping_invalid", "This file has no status column. Say whether these open estimates were already sent to customers in Housecall Pro.");
+  const estimates: ParsedEstimate[] = [];
+  const problems: EstimateProblem[] = [];
+  const seen = new Set<string>();
+  for (const [i, row] of rows.entries()) {
+    const rowNo = i + 2;
+    const get = (f: EstimateField) => (m[f] === undefined ? undefined : row[m[f]!]);
+    const estimateNumber = text(get("estimateNumber"), 160);
+    const customerName = text(get("customerName"), 200) ?? ([text(get("firstName"), 100), text(get("lastName"), 100)].filter(Boolean).join(" ") || "Unknown customer");
+    const problem = (reason: string) => problems.push({ row: rowNo, jobNumber: estimateNumber, customer: customerName, reason });
+    if (row.length !== header.length) { problem("column count does not match the header; nothing from this row was used"); continue; }
+    const estimateId = text(get("estimateId"), 160);
+    if (!estimateId) { problem("missing Housecall Pro estimate ID"); continue; }
+    if (seen.has(estimateId)) { problem("the same estimate ID appears more than once in this file; only the first row was used"); continue; }
+    seen.add(estimateId);
+    try {
+      const field = <T>(name: string, parse: () => T): T => {
+        try { return parse(); } catch (error) {
+          if (error instanceof RowError) throw new RowError(`${name} ${error.message}`);
+          throw error;
+        }
+      };
+      const rawStatus = text(get("status"), 80);
+      const classified = m.status === undefined ? "blank" : classifyHcpEstimateStatus(rawStatus);
+      if (classified === null) throw new RowError(`status "${rawStatus}" was not recognized; check this estimate`);
+      if (classified === "blank" && !input.openEstimatesAre) throw new RowError("has no status; say whether open estimates were sent, or fill in the status");
+      const state: EstimateState = classified === "blank" ? input.openEstimatesAre! : classified;
+      const email = text(get("email"), 200)?.toLowerCase() ?? null;
+      if (email && !z.email().safeParse(email).success) throw new RowError("email is not a valid address");
+      const phones = [digits(text(get("phone"), 40)), digits(text(get("homePhone"), 40))].filter((p) => p.length >= 7);
+      const a = { addressLine1: text(get("street"), 200), addressLine2: text(get("street2"), 200), city: text(get("city"), 100), state: text(get("state"), 50), postalCode: text(get("postalCode"), 20) };
+      const amountCents = field("Amount", () => parseHcpMoney(get("amount")));
+      const taxCents = field("Tax", () => parseHcpMoney(get("tax"))) ?? 0;
+      if (taxCents > 0 && (amountCents === null || taxCents > amountCents)) throw new RowError("Tax is more than the estimate amount");
+      const parsed = {
+        rowNo, estimateId, estimateNumber,
+        createdAt: field("Created date", () => parseHcpDate(get("createdAt"), input.timeZone)),
+        scheduledStart: field("Estimate date", () => parseHcpDate(get("scheduledStart"), input.timeZone)),
+        scheduledEnd: field("End time", () => parseHcpDate(get("scheduledEnd"), input.timeZone)),
+        customerName, email, phones, customerId: null,
+        address: a.addressLine1 && a.city && a.state && a.postalCode ? a as Address : null,
+        customerTags: list(get("customerTags")), rawStatus, state, amountCents, taxCents,
+        description: text(get("description"), 1000), employees: list(get("employees")),
+      };
+      if (parsed.scheduledEnd && parsed.scheduledStart && parsed.scheduledEnd < parsed.scheduledStart) throw new RowError("End time is before the estimate date");
+      const fingerprint = createHash("sha256").update(JSON.stringify({ ...parsed, rowNo: undefined })).digest("hex");
+      estimates.push({ ...parsed, fingerprint });
+    } catch (error) {
+      if (error instanceof RowError) { problem(error.message); continue; }
+      throw error;
+    }
+  }
+  return { totalRows: rows.length, estimates, problems };
+}
+
+export type EstimatesImportResult = {
+  dryRun: boolean; batchId: string | null; fileName: string | null; totalRows: number;
+  openEstimates: number; sent: number; drafts: number; decidedHistory: number; approved: number; declined: number; closed: number;
+  alreadyImported: number; changedSinceImport: number; visitsToBook: number; missingAmounts: number; propertiesCreated: number;
+  unmatched: EstimateProblem[]; problems: EstimateProblem[]; listsTruncated: boolean;
+  sample: { row: number; estimateNumber: string | null; customer: string; status: string; totalCents: number | null; action: string }[];
+};
+
+/**
+ * Open (undecided) estimates become a GrowthOS estimate on an imported
+ * opportunity in "estimate sent" or "estimate preparing", so the estimate
+ * workspace and the Revenue Desk follow-up see them. Approved, declined and
+ * closed estimates are read-only history on the customer. Nothing is sent:
+ * an imported "sent" estimate records what Housecall Pro said, and any
+ * follow-up stays a staff decision.
+ */
+export async function importHousecallEstimates(org: string, actor: string, raw: unknown, now = new Date()): Promise<EstimatesImportResult> {
+  const input = estimatesImportSchema.parse(raw);
+  const snapshotAsOf = exportCutoff(input.exportedOn, input.timeZone, now);
+  const parsed = parseEstimatesFile(input);
+  const batchId = input.dryRun ? null : randomUUID();
+  const fileName = text(input.fileName, 200);
+  const result: EstimatesImportResult = {
+    dryRun: input.dryRun, batchId, fileName, totalRows: parsed.totalRows,
+    openEstimates: 0, sent: 0, drafts: 0, decidedHistory: 0, approved: 0, declined: 0, closed: 0,
+    alreadyImported: 0, changedSinceImport: 0, visitsToBook: 0, missingAmounts: 0, propertiesCreated: 0,
+    unmatched: [], problems: [...parsed.problems], listsTruncated: false, sample: [],
+  };
+  const deadline = Date.now() + (input.dryRun ? PREVIEW_BUDGET_MS : COMMIT_BUDGET_MS);
+  const save = !input.dryRun;
+  const work = async (tx: Tx) => {
+    // Estimates are customer work: a real import takes the same locks as a native estimate.
+    if (save) await lockCustomerWork(tx, org);
+    await tx.execute(sql`select set_config('lock_timeout','5000ms',true), set_config('statement_timeout','15000ms',true)`);
+    await lockAndCheckCompany(tx, org);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`lead-import:${org}`}))`);
+    const customers = await loadCustomers(tx, org);
+    const propertiesByContact = await loadProperties(tx, org);
+    const ids = parsed.estimates.map((e) => e.estimateId);
+    const priorLeads = new Map<string, { contactId: string | null; fingerprint: string | null }>();
+    const priorHistory = new Map<string, { contactId: string | null; fingerprint: string | null }[]>();
+    for (let i = 0; i < ids.length; i += 1000) {
+      const slice = ids.slice(i, i + 1000);
+      for (const r of await tx.select({ externalOpportunityId: leadsTable.externalOpportunityId, contactId: leadsTable.contactId, importedHistory: leadsTable.importedHistory }).from(leadsTable)
+        .where(and(eq(leadsTable.organizationId, org), eq(leadsTable.importSourceKey, HCP_SOURCE_KEY), inArray(leadsTable.externalOpportunityId, slice.map(hcpEstimateExternalId)))).for("update"))
+        priorLeads.set(r.externalOpportunityId!.slice("estimate:".length), { contactId: r.contactId, fingerprint: r.importedHistory?.fingerprint ?? null });
+      for (const r of await tx.select({ id: sql<string>`${activitiesTable.metadata}->>'externalEstimateId'`, contactId: activitiesTable.contactId, fingerprint: sql<string | null>`${activitiesTable.metadata}->>'rowFingerprint'` })
+        .from(activitiesTable).where(and(eq(activitiesTable.organizationId, org), eq(activitiesTable.type, HCP_ESTIMATE_ACTIVITY), sql`${activitiesTable.leadId} IS NULL`,
+          inArray(sql`${activitiesTable.metadata}->>'externalEstimateId'`, slice))))
+        priorHistory.set(r.id, [...(priorHistory.get(r.id) ?? []), { contactId: r.contactId, fingerprint: r.fingerprint }]);
+    }
+    const tagIds = new Map<string, string>();
+    const tagLead = async (leadId: string, names: string[]) => {
+      for (const name of [...new Set(names)]) {
+        let tagId = tagIds.get(name.toLowerCase());
+        if (!tagId) {
+          await tx.insert(tagsTable).values({ organizationId: org, name }).onConflictDoNothing();
+          const [tag] = await tx.select({ id: tagsTable.id }).from(tagsTable).where(and(eq(tagsTable.organizationId, org), eq(tagsTable.name, name)));
+          tagId = tag!.id;
+          tagIds.set(name.toLowerCase(), tagId);
+        }
+        await tx.insert(leadTagsTable).values({ organizationId: org, leadId, tagId }).onConflictDoNothing();
+      }
+    };
+    for (const est of parsed.estimates) {
+      if (Date.now() > deadline) throw new HousecallImportError(503, "hcp_import_slow", "The import could not finish in time. Nothing was saved. Export a shorter date range and import each file.");
+      const listed = (list: EstimateProblem[], reason: string) => {
+        if (list.length < MAX_LISTED) list.push({ row: est.rowNo, jobNumber: est.estimateNumber, customer: est.customerName, reason });
+        else result.listsTruncated = true;
+      };
+      if (est.createdAt && est.createdAt > snapshotAsOf) { listed(result.problems, "the created date is after the export date"); continue; }
+      const matched = customers.match(est);
+      if ("reason" in matched) { listed(result.unmatched, matched.reason.replace("jobs", "estimates")); continue; }
+      const contactId = matched.contactId;
+      const label = `Housecall Pro estimate ${est.estimateNumber ?? est.estimateId}`;
+      const priorLead = priorLeads.get(est.estimateId);
+      const history = priorHistory.get(est.estimateId) ?? [];
+      if ([priorLead, ...history].some((p) => p && p.contactId !== contactId)) { listed(result.problems, "this estimate was imported before for a different customer; reconcile it before importing again"); continue; }
+      const open = est.state === "sent" || est.state === "draft";
+      if (priorLead || history.length) {
+        const same = priorLead ? priorLead.fingerprint === est.fingerprint : history.some((h) => h.fingerprint === est.fingerprint);
+        if (same) { result.alreadyImported++; continue; }
+        if (priorLead || open) {
+          // A GrowthOS estimate may already have been reviewed, sent or decided; it is never overwritten.
+          result.changedSinceImport++;
+          listed(result.problems, priorLead
+            ? "this estimate changed in Housecall Pro after it was imported; the GrowthOS estimate was kept, so update it there"
+            : "this estimate was imported as decided history and is now open in Housecall Pro; create the estimate in GrowthOS if it is still live");
+          continue;
+        }
+      }
+      const visitAhead = open && est.scheduledStart !== null && est.scheduledStart > now;
+      const missingAmount = open && est.amountCents === null;
+      const staffFollowUp = [
+        visitAhead ? `Estimate visit scheduled in Housecall Pro for ${est.scheduledStart!.toISOString()}; book it in GrowthOS.` : null,
+        missingAmount ? "The export has no amount for this estimate; add line items before sending." : null,
+      ].filter(Boolean).join(" ") || null;
+      let leadId: string | null = null, estimateRowId: string | null = null, propertyId: string | null = null;
+      if (open) {
+        const resolved = await resolveProperty(tx, org, contactId, est.address, propertiesByContact, save);
+        propertyId = resolved.propertyId;
+        if (resolved.created) result.propertiesCreated++;
+      }
+      if (open && save) {
+        const applied = {
+          status: ESTIMATE_LEAD_STATUS[est.state as "sent" | "draft"],
+          estimatedValueCents: est.amountCents !== null && est.amountCents <= 2_147_483_647 ? est.amountCents : null,
+          serviceType: null as string | null,
+          summary: (est.description ?? label).slice(0, 500),
+          latestSource: HCP_SOURCE_KEY,
+        };
+        const isoOrNull = (d: Date | null) => (d && d <= snapshotAsOf ? d.toISOString() : null);
+        const importedHistory = importedOpportunityHistorySchema.parse({
+          version: 1, kind: "csv_snapshot", originalCreatedAt: isoOrNull(est.createdAt), sourceUpdatedAt: null, statusChangedAt: null,
+          lastContactAt: null, snapshotAsOf: snapshotAsOf.toISOString(), firstImportedAt: now.toISOString(), lastImportedAt: now.toISOString(),
+          externalCustomerId: null, externalEstimateId: est.estimateId, currency: est.amountCents !== null ? "USD" : null,
+          fingerprint: est.fingerprint, appliedFingerprint: createHash("sha256").update(JSON.stringify(applied)).digest("hex"),
+          mappedFields: Object.keys(input.mapping).sort(),
+        });
+        const [lead] = await tx.insert(leadsTable).values({
+          organizationId: org, contactId, propertyId, ...applied, source: HCP_SOURCE_KEY,
+          creationMethod: "import", importSourceKey: HCP_SOURCE_KEY, externalOpportunityId: hcpEstimateExternalId(est.estimateId), importedHistory,
+        }).returning({ id: leadsTable.id });
+        leadId = lead!.id;
+        await tagLead(leadId, est.customerTags);
+        const subtotalCents = est.amountCents === null ? 0 : est.amountCents - est.taxCents;
+        const [row] = await tx.insert(estimatesTable).values({
+          organizationId: org, leadId, title: label, status: est.state as "sent" | "draft",
+          lineItems: est.amountCents === null ? [] : [{ description: (est.description ?? "Housecall Pro estimate total").slice(0, 500), quantity: 1, unitPriceCents: subtotalCents, totalCents: subtotalCents }],
+          subtotalCents, taxCents: est.amountCents === null ? 0 : est.taxCents, totalCents: est.amountCents ?? 0,
+          notes: `Imported from ${label}. The amount is the Housecall Pro total; review the line items before sending anything. The import sent nothing.`,
+          // Housecall Pro's send date is not in the export, so none is invented.
+          sentAt: null, acceptedAt: null,
+        }).returning();
+        estimateRowId = row!.id;
+        await recordEstimateSavedState(tx, org, row!, actor, null, { creation: true });
+        await tx.insert(auditEventsTable).values({ organizationId: org, actorUserId: actor, action: "estimate.created", entityType: "estimate", entityId: row!.id,
+          metadata: { source: "housecall_pro", sourceKey: HCP_SOURCE_KEY, batchId, externalEstimateId: est.estimateId, customerContact: false } });
+      }
+      if (save) {
+        // Read-only history record of what Housecall Pro said about this estimate.
+        await tx.insert(activitiesTable).values({
+          organizationId: org, leadId, contactId, actorUserId: actor, type: HCP_ESTIMATE_ACTIVITY,
+          title: `${label} (${open ? (est.state === "sent" ? "sent, awaiting a decision" : "not sent yet") : est.state})`,
+          body: est.description,
+          occurredAt: est.createdAt ?? (est.scheduledStart && est.scheduledStart <= now ? est.scheduledStart : null) ?? snapshotAsOf,
+          metadata: {
+            source: "housecall_pro", sourceKey: HCP_SOURCE_KEY, batchId, fileName, externalEstimateId: est.estimateId, estimateNumber: est.estimateNumber,
+            status: est.rawStatus, state: est.state, createdAt: est.createdAt?.toISOString() ?? null,
+            scheduledStart: est.scheduledStart?.toISOString() ?? null, scheduledEnd: est.scheduledEnd?.toISOString() ?? null,
+            totalCents: est.amountCents, taxCents: est.taxCents, employees: est.employees, customerTags: est.customerTags,
+            propertyId, estimateId: estimateRowId, staffFollowUp, rowFingerprint: est.fingerprint, readOnly: true,
+          },
+        });
+      }
+      if (open) {
+        result.openEstimates++;
+        if (est.state === "sent") result.sent++; else result.drafts++;
+        if (visitAhead) result.visitsToBook++;
+        if (missingAmount) result.missingAmounts++;
+      } else {
+        result.decidedHistory++;
+        result[est.state as "approved" | "declined" | "closed"]++;
+      }
+      if (result.sample.length < 5) result.sample.push({
+        row: est.rowNo, estimateNumber: est.estimateNumber, customer: customers.names.get(contactId) || est.customerName,
+        status: est.rawStatus ?? est.state, totalCents: est.amountCents,
+        action: open ? (est.state === "sent" ? "open estimate (sent), follow-up" : "draft estimate") : "history only",
+      });
+    }
+    if (!save) throw new DryRunRollback();
+    await tx.insert(auditEventsTable).values({
+      organizationId: org, actorUserId: actor, action: "housecall.estimates_imported", entityType: "housecall_import", entityId: batchId,
+      metadata: {
+        source: "housecall_pro", sourceKey: HCP_SOURCE_KEY, fileName, fileSha256: createHash("sha256").update(input.csv).digest("hex"),
+        exportedOn: input.exportedOn, timeZone: input.timeZone, openEstimatesAre: input.openEstimatesAre ?? null, totalRows: result.totalRows,
+        openEstimates: result.openEstimates, decidedHistory: result.decidedHistory, alreadyImported: result.alreadyImported,
+        changedSinceImport: result.changedSinceImport, unmatched: result.unmatched.length, problems: result.problems.length, customerContact: false,
       },
     });
   };

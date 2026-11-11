@@ -34,3 +34,26 @@ export function hcpJobsMapping() {
     employees: at("Employee"), status: at("Job Status"), completedAt: at("Finished"), invoiceSentAt: at("Invoice Sent"), leadSource: at("Online Booking Source"),
   };
 }
+
+/** Published estimates report columns ("Estimate" column switched to "Invoice", as the migration guide instructs). */
+export const HCP_ESTIMATES_HEADER = [
+  "Invoice", "HCP Id", "Created At", "Date", "End Time", "Travel Duration", "On Job Duration", "Total Duration",
+  "Customer", "First Name", "Last Name", "Email", "Company", "Mobile Phone", "Home Phone", "Customer Tag",
+  "Address", "Street", "Street Line 2", "City", "State", "Zip",
+] as const;
+/** Status and money columns are not in the published layout; these names are assumed. */
+export const HCP_ESTIMATES_EXTRA = ["Estimate Status", "Amount", "Tax"] as const;
+export type HcpEstimateRow = Partial<Record<(typeof HCP_ESTIMATES_HEADER)[number] | (typeof HCP_ESTIMATES_EXTRA)[number], string>>;
+export const hcpEstimatesCsv = (rows: HcpEstimateRow[], extra = false) =>
+  csv(extra ? [...HCP_ESTIMATES_HEADER, ...HCP_ESTIMATES_EXTRA] : HCP_ESTIMATES_HEADER, rows as Record<string, string>[]);
+export function hcpEstimatesMapping(extra = false) {
+  const at = (name: string) => (HCP_ESTIMATES_HEADER as readonly string[]).indexOf(name);
+  const base = {
+    estimateNumber: at("Invoice"), estimateId: at("HCP Id"), createdAt: at("Created At"), scheduledStart: at("Date"), scheduledEnd: at("End Time"),
+    customerName: at("Customer"), firstName: at("First Name"), lastName: at("Last Name"), email: at("Email"), phone: at("Mobile Phone"),
+    homePhone: at("Home Phone"), customerTags: at("Customer Tag"), street: at("Street"), street2: at("Street Line 2"), city: at("City"),
+    state: at("State"), postalCode: at("Zip"),
+  };
+  const n = HCP_ESTIMATES_HEADER.length;
+  return extra ? { ...base, status: n, amount: n + 1, tax: n + 2 } : base;
+}

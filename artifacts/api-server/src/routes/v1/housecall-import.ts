@@ -6,12 +6,13 @@ import { FinancialMigrationError } from "../../services/financial-migration-cont
 import {
   HousecallImportError,
   commitHousecallInvoices,
+  importHousecallEstimates,
   importHousecallJobs,
   previewHousecallInvoices,
 } from "../../services/housecall-import";
 import { financialApprovalGuard } from "./financial-migration";
 
-/** "Move from Housecall Pro": jobs history and invoices/open balances. Customers use /lead-imports (customers mode). */
+/** "Move from Housecall Pro": jobs history, estimates, and invoices/open balances. Customers use /lead-imports (customers mode). */
 const router: IRouter = Router();
 router.use("/housecall-import", (_req, res, next) => {
   res.set("Cache-Control", "no-store");
@@ -40,6 +41,12 @@ router.post(
   requireMember("crm.write"),
   rateLimit({ windowMs: 60_000, max: 10, key: "housecall-import-jobs" }),
   safe((req) => importHousecallJobs(req.member!.organizationId, req.member!.user.id, req.body)),
+);
+router.post(
+  "/housecall-import/estimates",
+  requireMember("crm.write"),
+  rateLimit({ windowMs: 60_000, max: 10, key: "housecall-import-estimates" }),
+  safe((req) => importHousecallEstimates(req.member!.organizationId, req.member!.user.id, req.body)),
 );
 router.post(
   "/housecall-import/invoices/preview",

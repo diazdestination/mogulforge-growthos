@@ -44,7 +44,7 @@ const MORE_FIELDS: { key: JobImportField; label: string }[] = [
   { key: "leadSource", label: "Lead / booking source" },
 ];
 
-type Problem = { row: number; jobNumber: string | null; customer: string | null; reason: string; totalCents?: number | null };
+export type Problem = { row: number; jobNumber: string | null; customer: string | null; reason: string; totalCents?: number | null };
 export type JobsResult = {
   dryRun: boolean; batchId: string | null; totalRows: number; newJobs: number; updatedJobs: number; alreadyImported: number;
   completed: number; upcoming: number; canceled: number; appointmentsCreated: number; needsScheduling: number; propertiesCreated: number;
@@ -63,10 +63,10 @@ export type InvoiceCommit = {
   totals: { reviews: number; invoices: number; receipts: number; documentTotalCents: number; openingReceivableCents: number; paymentCents: number };
 };
 
-class RequestError extends Error {
+export class RequestError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
-async function post<T>(path: string, body: unknown): Promise<T> {
+export async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     method: "POST", credentials: "include", cache: "no-store", signal: AbortSignal.timeout(150_000),
     headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -76,13 +76,13 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (value === null) throw new RequestError(0, "");
   return value as T;
 }
-const errorText = (err: unknown, saving: boolean) =>
+export const errorText = (err: unknown, saving: boolean) =>
   err instanceof RequestError && err.status >= 400 && err.status < 500 && err.message
     ? err.message
     : saving
       ? "We could not confirm the result. Some records may have been saved. Preview again before retrying; a repeat import never duplicates records."
       : "The file could not be checked. Nothing was imported.";
-function readText(file: File) {
+export function readText(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ""));
@@ -91,13 +91,13 @@ function readText(file: File) {
     reader.readAsText(file);
   });
 }
-const localToday = () => {
+export const localToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
 
-function ProblemList({ title, rows, truncated, testId }: { title: string; rows: Problem[]; truncated: boolean; testId: string }) {
+export function ProblemList({ title, rows, truncated, testId, noun = "job" }: { title: string; rows: Problem[]; truncated: boolean; testId: string; noun?: string }) {
   if (!rows.length) return null;
   return (
     <details open={rows.length <= 10} data-testid={testId}>
@@ -105,7 +105,7 @@ function ProblemList({ title, rows, truncated, testId }: { title: string; rows: 
       <ul className="mt-1 max-h-56 list-disc space-y-1 overflow-auto pl-5 text-muted-foreground">
         {rows.map((r) => (
           <li key={`${r.row}-${r.reason}`}>
-            Row {r.row}{r.jobNumber ? `, job ${r.jobNumber}` : ""}{r.customer ? ` (${r.customer})` : ""}{typeof r.totalCents === "number" ? `, ${money(r.totalCents)}` : ""}: {r.reason}
+            Row {r.row}{r.jobNumber ? `, ${noun} ${r.jobNumber}` : ""}{r.customer ? ` (${r.customer})` : ""}{typeof r.totalCents === "number" ? `, ${money(r.totalCents)}` : ""}: {r.reason}
           </li>
         ))}
       </ul>

@@ -162,6 +162,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /financial-migrations/:id": "settings.manage",
   "POST /financial-migrations/:id/commit": "settings.manage",
   "POST /housecall-import/jobs": "crm.write",
+  "POST /housecall-import/estimates": "crm.write",
   "POST /housecall-import/invoices/preview": "settings.manage",
   "POST /housecall-import/invoices/commit": "settings.manage",
   "GET /source-adoption": "crm.read",

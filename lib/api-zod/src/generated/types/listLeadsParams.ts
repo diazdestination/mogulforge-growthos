@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LeadStatus } from './leadStatus';
+import type { ListLeadsImportedHistory } from './listLeadsImportedHistory';
 
 export type ListLeadsParams = {
 status?: LeadStatus;
@@ -30,4 +31,8 @@ offset?: number;
  * When true, return only leads where the most recent portal message is newer than the most recent team reply.
  */
 hasUnreadPortalMessage?: boolean;
+/**
+ * Completed or lost jobs imported from Housecall Pro are history. hide (default) leaves them out, include shows everything, only shows just that history.
+ */
+importedHistory?: ListLeadsImportedHistory;
 };
