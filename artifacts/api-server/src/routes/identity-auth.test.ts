@@ -186,3 +186,49 @@ describe('staff email verification', () => {
     expect((await verify()).status).toBe(400);
   });
 });
+
+describe('verification mailbox proof', () => {
+  async function requestVerification() {
+    await db.update(usersTable).set({ emailVerifiedAt: null }).where(eq(usersTable.id, userId));
+    const send = vi.spyOn(resendEmailProvider, 'send').mockResolvedValue({ id: randomUUID(), provider: 'resend' });
+    const request = await fetch(`${baseUrl}/api/auth/resend-verification`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }),
+    });
+    expect(request.status).toBe(202);
+    expect(send).toHaveBeenCalledOnce();
+    const url = send.mock.calls[0][2].split('\n').find(line => line.startsWith('https://'));
+    return new URL(url!).searchParams.get('token')!;
+  }
+  const verify = (token: string) => fetch(`${baseUrl}/api/auth/verify-email`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }),
+  });
+  const verifiedAt = async () => (await db.select({ at: usersTable.emailVerifiedAt }).from(usersTable).where(eq(usersTable.id, userId)))[0]?.at ?? null;
+
+  it('does not verify an account whose address changed after the link was delivered', async () => {
+    const token = await requestVerification();
+    await db.update(usersTable).set({ email: `changed-${email}` }).where(eq(usersTable.id, userId));
+    const response = await verify(token);
+    expect(response.status).toBe(400);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(await verifiedAt()).toBeNull();
+    // The single-use link stays spent; restoring the address does not revive it.
+    await db.update(usersTable).set({ email }).where(eq(usersTable.id, userId));
+    expect((await verify(token)).status).toBe(400);
+    expect(await verifiedAt()).toBeNull();
+  });
+
+  it('does not stamp verification on an account deactivated after delivery', async () => {
+    const token = await requestVerification();
+    await db.update(usersTable).set({ isActive: false }).where(eq(usersTable.id, userId));
+    expect((await verify(token)).status).toBe(400);
+    expect(await verifiedAt()).toBeNull();
+  });
+
+  it('does not accept a link that was never sent to the mailbox', async () => {
+    await db.update(usersTable).set({ emailVerifiedAt: null }).where(eq(usersTable.id, userId));
+    const { issueIdentityTokenRecord } = await import('../services/identity-token');
+    const { token } = await issueIdentityTokenRecord({ userId, purpose: 'email_verification' });
+    expect((await verify(token)).status).toBe(400);
+    expect(await verifiedAt()).toBeNull();
+  });
+});

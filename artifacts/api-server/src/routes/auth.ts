@@ -4,9 +4,9 @@ import {
   GetCurrentAuthUserResponse,
   LogoutMobileSessionResponse,
 } from '@workspace/api-zod';
-import { db, sessionsTable, usersTable } from '@workspace/db';
+import { db, platformEmailDispatchesTable, sessionsTable, usersTable } from '@workspace/db';
 import { createHash } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
@@ -923,10 +923,28 @@ router.post('/auth/verify-email', async (req: Request, res: Response) => {
     return;
   }
 
+  // Mailbox proof: the token must have been handed to the platform sender for
+  // the account's CURRENT address. An address that changed after issuance
+  // (for example through an identity-provider profile update), an inactive
+  // account or a never-dispatched token cannot mark any mailbox verified.
+  // Rejected and not-attempted dispatches never carried the link.
+  const dispatches = platformEmailDispatchesTable;
   const [user] = await db
     .update(usersTable)
     .set({ emailVerifiedAt: new Date(), updatedAt: new Date() })
-    .where(eq(usersTable.id, consumed.userId))
+    .where(
+      and(
+        eq(usersTable.id, consumed.userId),
+        eq(usersTable.isActive, true),
+        sql`${usersTable.id} not like 'invite:%'`,
+        sql`exists (select 1 from ${dispatches}
+          where ${dispatches.identityTokenId} = ${consumed.tokenId}
+            and ${dispatches.purpose} = 'email_verification'
+            and ${dispatches.userId} = ${usersTable.id}
+            and ${dispatches.outcome} in ('accepted', 'unknown', 'claimed')
+            and ${dispatches.recipientHash} = encode(sha256(convert_to(lower(btrim(${usersTable.email})), 'UTF8')), 'hex'))`,
+      ),
+    )
     .returning();
   if (!user?.isActive) {
     res
