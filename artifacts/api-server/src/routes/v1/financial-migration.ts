@@ -17,7 +17,11 @@ import {
 } from "../../services/financial-migration";
 
 const router: IRouter = Router();
-router.use("/financial-migrations", (req, res, next) => {
+/**
+ * Financial approvals need a signed-in owner/admin in the trusted app: no API
+ * keys, no foreign origins, JSON only. Shared with the Housecall Pro invoice import.
+ */
+export function financialApprovalGuard(req: Request, res: Response, next: NextFunction): void {
   res.set("Cache-Control", "no-store").set("X-Content-Type-Options", "nosniff");
   if (req.get("x-api-key") !== undefined) {
     res
@@ -83,7 +87,8 @@ router.use("/financial-migrations", (req, res, next) => {
     return;
   }
   next();
-});
+}
+router.use("/financial-migrations", financialApprovalGuard);
 const safe =
   (work: (req: Request, res: Response) => Promise<unknown>) =>
   async (req: Request, res: Response, _next: NextFunction) => {

@@ -9,6 +9,7 @@ import {
   leadsTable,
   playbookEnrollmentsTable,
   playbooksTable,
+  propertiesTable,
   reactivationCampaignLeadsTable,
   reactivationCampaignsTable,
   suppressionsTable,
@@ -114,6 +115,18 @@ export const IMPORT_FIELDS = [
   "lastContactAt",
   "estimatedValue",
   "currency",
+  // Customer imports only: up to two service addresses and customer tags.
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "state",
+  "postalCode",
+  "address2Line1",
+  "address2Line2",
+  "address2City",
+  "address2State",
+  "address2PostalCode",
+  "tags",
 ] as const;
 export type ImportField = (typeof IMPORT_FIELDS)[number];
 
@@ -150,6 +163,9 @@ export interface LeadImportPreview {
   conflicts: number;
   skipped: number;
   suppressed: number;
+  /** Customer imports: new service-address properties and import notes. */
+  propertiesCreated: number;
+  notesRecorded: number;
   errors: string[];
   errorsTruncated: boolean;
   sourceKey: string | null;
@@ -195,7 +211,17 @@ interface ImportLeadsParams {
      */
     mode?: "leads" | "customers";
 }
-const CUSTOMER_IMPORT_FIELDS = new Set<ImportField>(["firstName", "lastName", "email", "phone", "externalCustomerId"]);
+const CUSTOMER_ADDRESS_FIELDS = new Set<ImportField>([
+  "addressLine1", "addressLine2", "city", "state", "postalCode",
+  "address2Line1", "address2Line2", "address2City", "address2State", "address2PostalCode",
+]);
+const CUSTOMER_IMPORT_FIELDS = new Set<ImportField>([
+  "firstName", "lastName", "email", "phone", "externalCustomerId", "tags", "source", "notes", ...CUSTOMER_ADDRESS_FIELDS,
+]);
+/** Same street/postal code, ignoring case, punctuation and spacing. */
+export function propertyAddressKey(line1: string, postalCode: string): string {
+  return `${line1.toLowerCase().replace(/[^a-z0-9]/g, "")}|${postalCode.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+}
 /** Per-contact provenance for customer-mode imports (contacts have no source columns). */
 export const CUSTOMER_IMPORTED_ACTION = "customer.imported";
 async function runLeadImport(
@@ -240,7 +266,10 @@ async function runLeadImport(
   }
   const customers = params.mode === "customers";
   if (customers && Object.keys(m).some((key) => !CUSTOMER_IMPORT_FIELDS.has(key as ImportField))) {
-    return { error: "A customer import only uses name, email, phone and customer ID columns" };
+    return { error: "A customer import only uses name, email, phone, customer ID, service address, tags, lead source and notes columns" };
+  }
+  if (!customers && Object.keys(m).some((key) => CUSTOMER_ADDRESS_FIELDS.has(key as ImportField) || key === "tags")) {
+    return { error: "Service address and tag columns are only used by a customer import" };
   }
   if (customers && m.externalCustomerId !== undefined && !sourceKey) {
     return { error: "A stable source key is required when mapping customer IDs" };
@@ -258,6 +287,8 @@ async function runLeadImport(
   let conflicts = 0;
   let skipped = 0;
   let suppressedCount = 0;
+  let propertiesCreated = 0;
+  let notesRecorded = 0;
   const errors: string[] = [];
   // A preview is for reviewing every problem row before anything is saved.
   const maxErrors = params.dryRun ? MAX_PREVIEW_ERROR_SAMPLES : MAX_ERROR_SAMPLES;
@@ -376,6 +407,52 @@ async function runLeadImport(
         firstImportedAt: receivedAt.toISOString(), lastImportedAt: receivedAt.toISOString(),
       };
       importedOpportunityHistorySchema.parse(history);
+      // Customer imports keep each complete service address as a property and
+      // tags/lead source/notes as one note on the person. Re-imports add nothing twice.
+      const addressWarnings: string[] = [];
+      const addresses = customers ? ([
+        ["addressLine1", "addressLine2", "city", "state", "postalCode"],
+        ["address2Line1", "address2Line2", "address2City", "address2State", "address2PostalCode"],
+      ] as const).flatMap(([l1, l2, cityField, stateField, postalField], n) => {
+        const value = { addressLine1: clean(get(l1)), addressLine2: clean(get(l2)), city: clean(get(cityField), 100), state: clean(get(stateField), 50), postalCode: clean(get(postalField), 20) };
+        const required = [value.addressLine1, value.city, value.state, value.postalCode];
+        if (required.every(Boolean)) return [value as { addressLine1: string; addressLine2: string | null; city: string; state: string; postalCode: string }];
+        if (required.some(Boolean) || value.addressLine2) addressWarnings.push(`Row ${rowNo}: service address ${n + 1} is missing street, city, state or ZIP; no property was created for it`);
+        return [];
+      }) : [];
+      const customerNote = customers ? { tags: clean(get("tags"), 500), leadSource: clean(get("source"), 100), notes: clean(get("notes"), 2000) } : null;
+      // Counted only once the row's transaction has succeeded.
+      const enriched = { properties: 0, notes: 0 };
+      const enrichCustomer = async (tx: Tx, contactId: string, externalCustomerId: string | null) => {
+        if (addresses.length) {
+          const existingProperties = await tx.select({ addressLine1: propertiesTable.addressLine1, postalCode: propertiesTable.postalCode })
+            .from(propertiesTable).where(and(eq(propertiesTable.organizationId, organizationId), eq(propertiesTable.contactId, contactId)));
+          const known = new Set(existingProperties.map((p) => propertyAddressKey(p.addressLine1, p.postalCode)));
+          for (const address of addresses) {
+            const key = propertyAddressKey(address.addressLine1, address.postalCode);
+            if (known.has(key)) continue;
+            known.add(key);
+            await tx.insert(propertiesTable).values({ organizationId, contactId, ...address });
+            enriched.properties++;
+          }
+        }
+        if (customerNote && (customerNote.tags || customerNote.leadSource || customerNote.notes)) {
+          const importFingerprint = createHash("sha256").update(JSON.stringify({ sourceKey, externalCustomerId, ...customerNote })).digest("hex");
+          const [already] = await tx.select({ id: activitiesTable.id }).from(activitiesTable).where(and(
+            eq(activitiesTable.organizationId, organizationId), eq(activitiesTable.contactId, contactId), eq(activitiesTable.type, "note"),
+            sql`${activitiesTable.metadata}->>'importFingerprint' = ${importFingerprint}`,
+          )).limit(1);
+          if (!already) {
+            await tx.insert(activitiesTable).values({
+              organizationId, contactId, actorUserId: params.createdByUserId ?? null, type: "note",
+              title: sourceKey === "housecall-pro" ? "Imported from Housecall Pro" : "Imported customer details",
+              body: [customerNote.tags && `Tags: ${customerNote.tags}`, customerNote.leadSource && `Lead source: ${customerNote.leadSource}`, customerNote.notes && `Notes: ${customerNote.notes}`].filter(Boolean).join("\n"),
+              metadata: { importFingerprint, batchId, sourceKey, externalCustomerId, tags: customerNote.tags ? customerNote.tags.split(/\s*[,;]\s*/).filter(Boolean) : [], leadSource: customerNote.leadSource },
+            });
+            enriched.notes++;
+          }
+        }
+      };
       const outcome = await runRow(async (tx) => {
         // Import requests for one tenant serialize contact matching and opportunity creation.
         // The unique index remains the final protection against duplicate source IDs.
@@ -439,12 +516,14 @@ async function runLeadImport(
             // Remember which existing person this source ID is, so a later
             // re-import with changed details is flagged rather than duplicated.
             if (sourceKey && externalCustomerId && !known.length) await provenance(contact.id, true);
+            await enrichCustomer(tx, contact.id, externalCustomerId);
             return { kind: "duplicate" } as const;
           }
           const [created] = await tx.insert(contactsTable).values({
             organizationId, firstName, lastName: clean(get("lastName"), 100), email, phone,
           }).returning({ id: contactsTable.id });
           await provenance(created.id, false);
+          await enrichCustomer(tx, created.id, externalCustomerId);
           return { kind: "imported" } as const;
         }
         if (sourceKey && history.externalCustomerId) {
@@ -530,11 +609,16 @@ async function runLeadImport(
       if (outcome.kind === "conflict") {
         conflicts++;
         if (errors.length < maxErrors) errors.push(`Row ${rowNo}: ${outcome.reason}`);
-      } else if (outcome.kind === "duplicate") duplicates++;
-      else {
-        if (outcome.kind === "updated") updated++;
-        else imported++;
-        if (isSuppressed) suppressedCount++;
+      } else {
+        propertiesCreated += enriched.properties;
+        notesRecorded += enriched.notes;
+        for (const warning of addressWarnings) if (errors.length < maxErrors) errors.push(warning);
+        if (outcome.kind === "duplicate") duplicates++;
+        else {
+          if (outcome.kind === "updated") updated++;
+          else imported++;
+          if (isSuppressed) suppressedCount++;
+        }
       }
     } catch (err) {
       // A preview must not report an unexpected database failure (such as a
@@ -577,7 +661,7 @@ async function runLeadImport(
     return {
       dryRun: true, fileName: clean(params.fileName, 200), totalRows: rows.length,
       imported, updated, duplicates, conflicts, skipped, suppressed: suppressedCount,
-      errors, errorsTruncated: errors.length >= maxErrors, sourceKey, snapshotAsOf,
+      propertiesCreated, notesRecorded, errors, errorsTruncated: errors.length >= maxErrors, sourceKey, snapshotAsOf,
     };
   }
   await processRows();
@@ -606,9 +690,11 @@ async function runLeadImport(
     action: customers ? "customers.imported" : "leads.imported",
     entityType: "lead_import",
     entityId: record.id,
-    metadata: { imported, updated, duplicates, conflicts, skipped, sourceKey, snapshotAsOf, ...(customers ? { mode: "customers", batchId } : {}) },
+    metadata: { imported, updated, duplicates, conflicts, skipped, sourceKey, snapshotAsOf, ...(customers ? { mode: "customers", batchId, propertiesCreated, notesRecorded } : {}) },
   });
-  return record;
+  if (!customers) return record;
+  const result: LeadImport & { propertiesCreated: number; notesRecorded: number } = { ...record, propertiesCreated, notesRecorded };
+  return result;
 }
 
 export async function listImports(organizationId: string): Promise<LeadImport[]> {

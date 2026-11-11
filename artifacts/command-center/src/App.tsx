@@ -20,6 +20,7 @@ import Dashboard from '@/pages/dashboard';
 import Today from '@/pages/today';
 import Invoices from '@/pages/invoices';
 import FinancialMigrations from '@/pages/financial-migrations';
+import MoveFromHousecall from '@/pages/move-from-housecall';
 import Assistant from '@/pages/assistant';
 import Pipeline from '@/pages/pipeline';
 import Insights from '@/pages/insights';
@@ -617,6 +618,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/invoices/:id" component={Invoices} />
           <Route path="/invoices" component={Invoices} />
           <Route path="/financial-migrations" component={FinancialMigrations} />
+          <Route path="/move-from-housecall-pro" component={MoveFromHousecall} />
           <Route path="/audit" component={AuditLog} />
           <Route path="/settings" component={Settings} />
           <Route path="/account" component={Account} />
