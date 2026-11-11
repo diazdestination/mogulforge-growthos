@@ -224,6 +224,12 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const liveModeAfter = await fingerprints(source);
     assert.deepEqual(liveModeAfter.tables, approvalAfter.tables);
     migrations.push({ file: '0025_bill-stripe-live-mode.sql', sha256: sha(liveModeSql) });
+    // 0026 adds the CALLIE text-back settings column (nullable); every table's rows are unchanged.
+    const callieSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0026_callie-text-back-settings.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(callieSql);
+    const callieAfter = await fingerprints(source);
+    assert.deepEqual(callieAfter.tables, liveModeAfter.tables);
+    migrations.push({ file: '0026_callie-text-back-settings.sql', sha256: sha(callieSql) });
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;
