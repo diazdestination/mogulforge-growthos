@@ -13,8 +13,10 @@ Run the full CI gate on the final #84 head before its main merge.
 - Follow BETA-LAUNCH-PLAN.md: provision the current schema only on a confirmed
   fresh database. Never run drizzle-kit push against the historical V1 database.
   New paid resources need the owner's cost approval before creation.
-- fly.toml no longer invokes the retired release-schema.mjs, which always exits
-  with a refusal. Schema provisioning and verification are separate steps.
+- fly.toml replaces the retired release-schema.mjs refusal with a read-only
+  current-column check. Incomplete schemas refuse deployment. This check does not
+  establish types, constraints or fresh-database identity; those must be verified
+  separately. Schema provisioning remains a separate step.
 - Confirm the OpenAI credential choice and install OPENAI_API_KEY only in the
   server secret store. Inspect names/statuses without displaying values. Confirm
   model access and run an owner-only assistant/draft check after deployment.
