@@ -11,11 +11,13 @@ import {
   type InvoicePaymentLink,
   type InvoicePaymentLinkState,
   type StripeConnectAccount,
+  type UserRole,
 } from "@workspace/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import Stripe from "stripe";
 
 import { recordAudit } from "./audit";
+import { readFieldInvoice } from "./field-collect";
 import { getInvoice, readInvoiceDetail, recordInvoicePayment } from "./invoices";
 import { outboundDeliveryHeld } from "./outbound-hold";
 import { lockCustomerWork } from "./customer-work-lineage";
@@ -284,6 +286,8 @@ export async function createInvoicePaymentLink(
   organizationId: string,
   userId: string,
   invoiceId: string,
+  /** Field collection from My day: the invoice must be linked to this appointment assigned to the user (payments.collect). */
+  field?: { appointmentId: string; effectiveRole?: UserRole },
 ): Promise<InvoicePaymentLinkView> {
   const stripe = requireStripe();
   if (outboundDeliveryHeld()) {
@@ -298,7 +302,9 @@ export async function createInvoicePaymentLink(
   // reservation even if this process loses the Checkout response or stops.
   const reservation = await db.transaction(async tx => {
     await lockCustomerWork(tx, organizationId, true);
-    const invoice = await readInvoiceDetail(tx, organizationId, userId, invoiceId, { lockRows: true });
+    const invoice = field
+      ? (await readFieldInvoice(tx, organizationId, { userId, effectiveRole: field.effectiveRole }, invoiceId, field.appointmentId, { lockRows: true })).invoice
+      : await readInvoiceDetail(tx, organizationId, userId, invoiceId, { lockRows: true });
     if (invoice.status !== "issued" || invoice.reconciliationRequired) throw new StripeConnectError("Review the issued invoice before collecting payments.", "invalid");
     const amountCents = invoice.balanceDueCents ?? 0;
     if (amountCents < 50) throw new StripeConnectError("This invoice has no balance to collect.", "invalid");
@@ -315,10 +321,10 @@ export async function createInvoicePaymentLink(
     return { existing: null, invoice, link: link! };
   });
   if (reservation.existing) return linkView(reservation.existing);
-  return createReservedCheckout(reservation.link, reservation.invoice);
+  return createReservedCheckout(reservation.link, reservation.invoice, field ? { via: "my_day", appointmentId: field.appointmentId } : {});
 }
 
-async function createReservedCheckout(link: InvoicePaymentLink, invoice: Awaited<ReturnType<typeof readInvoiceDetail>>): Promise<InvoicePaymentLinkView> {
+async function createReservedCheckout(link: InvoicePaymentLink, invoice: Awaited<ReturnType<typeof readInvoiceDetail>>, auditContext: Record<string, string> = {}): Promise<InvoicePaymentLinkView> {
   const stripe = requireStripe();
   const { organizationId, invoiceId, createdByUserId: userId } = link;
   const amountCents = link.amountCents;
@@ -372,7 +378,7 @@ async function createReservedCheckout(link: InvoicePaymentLink, invoice: Awaited
     action: "payments.invoice_link_created",
     entityType: "invoice_payment_link",
     entityId: link!.id,
-    metadata: { invoiceId, invoiceVersion: invoice.version, amountCents, applicationFeeCents: fee },
+    metadata: { invoiceId, invoiceVersion: invoice.version, amountCents, applicationFeeCents: fee, ...auditContext },
   });
   if (updated) return linkView(updated);
   const [current] = await db.select().from(invoicePaymentLinksTable).where(eq(invoicePaymentLinksTable.id, link.id));

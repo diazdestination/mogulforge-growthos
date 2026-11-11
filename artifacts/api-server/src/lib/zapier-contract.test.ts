@@ -61,8 +61,10 @@ describe("Zapier capability registry", () => {
       expect(definition.candidates.length).toBeGreaterThan(0);
       expect(["read", "write"]).toContain(definition.direction);
       expect(definition.defaultDailyBudget).toBeGreaterThan(0);
-      // Writes default to human approval unless the registry explicitly says auto.
-      if (definition.direction === "write" && definition.key !== "appt.calendar.create_event") {
+      // Writes default to human approval unless the registry explicitly says auto. The two field
+      // texts are only ever requested by a person tapping Send for one customer; that tap approves.
+      const tapApproved = ["appt.calendar.create_event", "appt.sms.on_my_way", "bill.sms.payment_link"];
+      if (definition.direction === "write" && !tapApproved.includes(definition.key)) {
         expect(definition.defaultMode).toBe("approve");
       }
     }

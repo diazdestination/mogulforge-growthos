@@ -47,6 +47,7 @@ type Capability = {
   direction: 'read' | 'write';
   label: string;
   description: string;
+  recommendedMode?: 'approve' | 'auto';
   candidates: { app: string; appName: string; action: string; actionName: string; configFields: { key: string; label: string; required: boolean }[] }[];
   binding: {
     app: string;
@@ -597,6 +598,9 @@ function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind
         <p className="text-xs text-muted-foreground">Texts go only to customers who agreed to receive them and end with "Reply STOP to opt out." Replies and STOP requests arrive in your phone app, not GrowthOS. If a customer opts out, mark them do not text on their customer record.</p>
       )}
       <p className="text-xs text-muted-foreground">{!capability.binding ? 'Select and configure a supported action to set up this flow.' : !configured ? 'Required settings are missing. Save a complete binding before choosing a policy.' : capability.policy.mode === 'off' ? 'Configured · Off. Choose a policy to allow this flow.' : capability.policy.dailyBudget === 0 ? 'Paused · Daily limit is 0.' : 'Configured · Policy enabled. Provider execution has not been verified by this setup.'}</p>
+      {CUSTOMER_TEXT_KEYS.includes(capability.key) && capability.recommendedMode === 'auto' && (
+        <p className="text-xs text-muted-foreground">Recommended: Automatic. A team member taps Send for one customer with fixed wording, so that tap is the approval. Choose Approve each to have the office review every text first.</p>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label htmlFor={`${id}-policy`} className="text-xs">Policy</Label>

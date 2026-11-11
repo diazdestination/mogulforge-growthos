@@ -1,8 +1,10 @@
 import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
 import QRCode from "qrcode";
+import { db } from "@workspace/db";
 import { z } from "zod";
 
 import { requireMember } from "../../middlewares/requireMember";
+import { assertFieldCollectScope, FieldCollectError } from "../../services/field-collect";
 import { InvoiceError } from "../../services/invoice-contract";
 import {
   beginStripeConnect,
@@ -38,7 +40,7 @@ function fail(res: Response, error: unknown): void {
     res.status(status).json({ error: error.message, code: error.code });
     return;
   }
-  if (error instanceof InvoiceError) {
+  if (error instanceof InvoiceError || error instanceof FieldCollectError) {
     res.status(error.status).json({ error: error.message, code: error.code });
     return;
   }
@@ -81,16 +83,56 @@ router.get("/invoices/:id/payment-links", requireMember("invoices.read"), async 
   }
 });
 
+async function payLinkQr(organizationId: string, id: string, linkId: string) {
+  const link = (await listInvoicePaymentLinks(organizationId, id)).find(item => item.id === linkId);
+  if (!link) throw new StripeConnectError("Payment link not found.", "not_found");
+  if (link.state !== "open" || !link.url || !/^https:\/\//.test(link.url)) throw new StripeConnectError("This pay link is no longer open. Create a new one for the current balance.", "invalid");
+  const qrDataUrl = await QRCode.toDataURL(link.url, { margin: 1, width: 320, errorCorrectionLevel: "M" });
+  return { linkId: link.id, url: link.url, amountCents: link.amountCents, expiresAt: link.expiresAt, qrDataUrl };
+}
+
 // QR of the open pay link so a customer can pay on their own phone in person.
 router.get("/invoices/:id/payment-links/:linkId/qr", requireMember("invoices.read"), async (req: Request, res: Response): Promise<void> => {
   res.setHeader("Cache-Control", "no-store");
   try {
-    const id = invoiceId.parse(String(req.params.id)), linkId = invoiceId.parse(String(req.params.linkId));
-    const link = (await listInvoicePaymentLinks(req.member!.organizationId, id)).find(item => item.id === linkId);
-    if (!link) throw new StripeConnectError("Payment link not found.", "not_found");
-    if (link.state !== "open" || !link.url || !/^https:\/\//.test(link.url)) throw new StripeConnectError("This pay link is no longer open. Create a new one for the current balance.", "invalid");
-    const qrDataUrl = await QRCode.toDataURL(link.url, { margin: 1, width: 320, errorCorrectionLevel: "M" });
-    res.json({ linkId: link.id, url: link.url, amountCents: link.amountCents, expiresAt: link.expiresAt, qrDataUrl });
+    res.json(await payLinkQr(req.member!.organizationId, invoiceId.parse(String(req.params.id)), invoiceId.parse(String(req.params.linkId))));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+// ---- Field collection (payments.collect): only an invoice linked to the member's own assigned job. ----
+function fieldParams(req: Request) {
+  return { appointmentId: invoiceId.parse(String(req.params.appointmentId)), id: invoiceId.parse(String(req.params.id)) };
+}
+const fieldActor = (req: Request) => ({ userId: req.member!.user.id, effectiveRole: req.member!.role });
+
+router.get("/appointments/:appointmentId/invoices/:id/payment-links", requireMember("payments.collect"), async (req: Request, res: Response): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const { appointmentId, id } = fieldParams(req);
+    await assertFieldCollectScope(db, req.member!.organizationId, fieldActor(req), id, appointmentId);
+    res.json({ links: await listInvoicePaymentLinks(req.member!.organizationId, id) });
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.post("/appointments/:appointmentId/invoices/:id/payment-links", requireMember("payments.collect"), sessionOnly, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { appointmentId, id } = fieldParams(req);
+    res.status(201).json({ link: await createInvoicePaymentLink(req.member!.organizationId, req.member!.user.id, id, { appointmentId, effectiveRole: req.member!.role }) });
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.get("/appointments/:appointmentId/invoices/:id/payment-links/:linkId/qr", requireMember("payments.collect"), async (req: Request, res: Response): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const { appointmentId, id } = fieldParams(req);
+    await assertFieldCollectScope(db, req.member!.organizationId, fieldActor(req), id, appointmentId);
+    res.json(await payLinkQr(req.member!.organizationId, id, invoiceId.parse(String(req.params.linkId))));
   } catch (error) {
     fail(res, error);
   }

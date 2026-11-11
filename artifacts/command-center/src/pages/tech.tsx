@@ -72,21 +72,27 @@ async function flow(path: string, body: Record<string, unknown>): Promise<{ stat
   }
 }
 
-/** Reading the ledger state honestly: only "succeeded" means the phone app accepted the text. */
+/**
+ * Reading the ledger state honestly. With the Automatic policy your tap sends the
+ * text straight to Zapier; with Approve each it waits for the office. "succeeded"
+ * means Zapier accepted it for your phone app, not that the customer read it.
+ */
 function textResult(status: number, outcome: FlowOutcome | null): { message: string; hold: boolean } {
   const state = outcome?.execution?.state;
-  if (!state && (status === 400 || status === 404) && typeof outcome?.error === "string") return { message: `Not sent: ${outcome.error}`, hold: false };
+  if (!state && (status === 400 || status === 403 || status === 404) && typeof outcome?.error === "string") return { message: `Not sent: ${outcome.error}`, hold: false };
   if (!state && status === 409 && typeof outcome?.error === "string") return { message: outcome.error, hold: true };
   if (state === "pending_approval") return { message: "Waiting for approval. Not sent yet.", hold: true };
-  if (state === "succeeded") return { message: "Sent from your business number.", hold: true };
+  if (state === "succeeded") return { message: "Sent to Zapier. Your phone app sends it from your business number.", hold: true };
+  if (state === "executing") return { message: "Sending…", hold: true };
   if (state === "blocked" || state === "failed" || state === "rejected") return { message: `Not sent: ${outcome?.execution?.detail || "the text did not go out."}`, hold: false };
   return { message: "We could not confirm whether the text went out. Check recent actions in Settings before trying again.", hold: true };
 }
 
 function onMyWayLabel(state: string) {
   if (state === "pending_approval") return "On My Way waiting for approval";
-  if (state === "succeeded") return "On My Way sent";
-  if (state === "executing" || state === "indeterminate") return "On My Way being checked";
+  if (state === "succeeded") return "On My Way sent to Zapier";
+  if (state === "executing") return "On My Way sending";
+  if (state === "indeterminate") return "On My Way being checked";
   return `On My Way ${human(state)}`;
 }
 
@@ -224,6 +230,7 @@ function OnMyWay({ job, ready, onChanged }: { job: MyDayJob; ready: boolean; onC
   async function send() {
     if (locked) return;
     setBusy(true);
+    setResult({ message: "Sending…", hold: true });
     const response = await flow(`appointments/${job.id}/on-my-way`, { etaMinutes: eta ? Number(eta) : null });
     setResult(textResult(response.status, response.outcome));
     setBusy(false);
@@ -236,7 +243,7 @@ function OnMyWay({ job, ready, onChanged }: { job: MyDayJob; ready: boolean; onC
         <p className="text-sm">On My Way texts are not set up. An owner or admin can connect your phone app in Settings → Connections → Zapier Connected Apps (APPT · Text On My Way).</p>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">Texts {job.customerName ?? "the customer"} from your business number that you're on the way. Only customers who agreed to texts get one, once per job per day.</p>
+          <p className="text-sm text-muted-foreground">Texts {job.customerName ?? "the customer"} from your business number that you're on the way. Only customers who agreed to texts get one, once per job per day. Your company's setting decides whether your tap sends it right away or the office approves it first.</p>
           {existing && <p className="text-sm font-medium">{onMyWayLabel(existing.state)}{existing.etaMinutes ? ` · about ${existing.etaMinutes} minutes` : ""}</p>}
           <label className="block text-sm font-medium" htmlFor={`eta-${job.id}`}>Arriving in about</label>
           <select id={`eta-${job.id}`} className="min-h-12 w-full rounded-lg border border-input bg-background px-3 text-base" value={eta} disabled={locked} onChange={(event) => setEta(event.target.value)}>
@@ -267,11 +274,13 @@ function CollectPayment({ job, day }: { job: MyDayJob; day: MyDay }) {
   const [textOutcome, setTextOutcome] = useState<{ message: string; hold: boolean } | null>(null);
   const current = useRef(invoice?.id);
   current.current = invoice?.id;
+  // Field collection is scoped to this job: the server checks the invoice is linked to an appointment assigned to you.
+  const jobInvoicePath = invoice ? `/appointments/${job.id}/invoices/${invoice.id}` : "";
 
   async function loadLinks() {
     if (!invoice) return;
     try {
-      const list = await api<{ links?: PayLink[] }>(`/invoices/${invoice.id}/payment-links`);
+      const list = await api<{ links?: PayLink[] }>(`${jobInvoicePath}/payment-links`);
       if (current.current === invoice.id) setLinks(Array.isArray(list.links) ? list.links : []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Pay links could not be loaded.");
@@ -280,15 +289,15 @@ function CollectPayment({ job, day }: { job: MyDayJob; day: MyDay }) {
   useEffect(() => { void loadLinks(); }, [invoice?.id]);
 
   if (job.invoices === null) {
-    return <section className={card} aria-label="Collect payment"><h2 className="text-lg font-semibold">Collect payment</h2><p className="text-sm">Collecting payment needs invoice access. Ask the office to send the customer a pay link.</p></section>;
+    return <section className={card} aria-label="Collect payment"><h2 className="text-lg font-semibold">Collect payment</h2><p className="text-sm">Collecting payment here needs field collection access for this job. Ask the office to send the customer a pay link.</p></section>;
   }
   if (!invoice) {
     const paid = job.invoices.find((item) => item.paymentState === "paid");
     return (
       <section className={card} aria-label="Collect payment">
         <h2 className="text-lg font-semibold">Collect payment</h2>
-        {paid ? <p className="text-base">Invoice {paid.invoiceNumber ?? ""} is paid in full.</p> : <p className="text-sm">No issued invoice with a balance for this customer yet. An invoice has to be created and issued before you can collect.</p>}
-        <Link className={secondary} href={job.leadId ? `/invoices?leadId=${job.leadId}` : "/invoices"}>Open invoices</Link>
+        {paid ? <p className="text-base">Invoice {paid.invoiceNumber ?? ""} is paid in full.</p> : <p className="text-sm">No issued invoice with a balance is linked to this job yet. The office creates and issues the invoice for this job's lead or customer before you can collect.</p>}
+        {day.canReadInvoices && <Link className={secondary} href={job.leadId ? `/invoices?leadId=${job.leadId}` : "/invoices"}>Open invoices</Link>}
       </section>
     );
   }
@@ -298,21 +307,22 @@ function CollectPayment({ job, day }: { job: MyDayJob; day: MyDay }) {
 
   async function createLink() {
     setBusy(true); setError(null);
-    try { await api(`/invoices/${invoice!.id}/payment-links`, { method: "POST", body: "{}" }); await loadLinks(); }
+    try { await api(`${jobInvoicePath}/payment-links`, { method: "POST", body: "{}" }); await loadLinks(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create the pay link."); }
     finally { setBusy(false); }
   }
   async function showQr() {
     if (!open) return;
     setBusy(true); setError(null);
-    try { const result = await api<{ qrDataUrl: string; linkId: string }>(`/invoices/${invoice!.id}/payment-links/${open.id}/qr`); if (result.linkId === open.id && result.qrDataUrl.startsWith("data:image/png;base64,")) setQr(result.qrDataUrl); }
+    try { const result = await api<{ qrDataUrl: string; linkId: string }>(`${jobInvoicePath}/payment-links/${open.id}/qr`); if (result.linkId === open.id && result.qrDataUrl.startsWith("data:image/png;base64,")) setQr(result.qrDataUrl); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "The QR code could not be shown."); }
     finally { setBusy(false); }
   }
   async function textLink() {
     if (textOutcome?.hold) return;
     setBusy(true);
-    const response = await flow(`invoices/${invoice!.id}/pay-link-text`, {});
+    setTextOutcome({ message: "Sending…", hold: true });
+    const response = await flow(`appointments/${job.id}/invoices/${invoice!.id}/pay-link-text`, {});
     setTextOutcome(textResult(response.status, response.outcome));
     setBusy(false);
   }

@@ -339,6 +339,8 @@ export type ZapierCapabilityView = {
   direction: "read" | "write";
   label: string;
   description: string;
+  /** The mode Settings recommends when the owner turns this flow on. Every flow starts off until they do. */
+  recommendedMode: "approve" | "auto";
   candidates: { app: string; appName: string; action: string; actionName: string; configFields: { key: string; label: string; required: boolean }[] }[];
   binding: {
     app: string;
@@ -373,6 +375,7 @@ export async function listZapierCapabilities(organizationId: string): Promise<Za
       direction: definition.direction,
       label: definition.label,
       description: definition.description,
+      recommendedMode: definition.defaultMode,
       candidates: definition.candidates.map((candidate) => ({
         app: candidate.app,
         appName: candidate.appName,

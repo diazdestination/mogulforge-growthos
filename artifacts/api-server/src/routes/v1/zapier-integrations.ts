@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
 import { z } from "zod";
 
+import { FieldCollectError } from "../../services/field-collect";
 import { requireMember } from "../../middlewares/requireMember";
 import { ZAPIER_EXECUTION_STATES, type ZapierExecutionState } from "@workspace/db";
 import {
@@ -64,6 +65,10 @@ function fail(res: Response, error: unknown): void {
   }
   if (error instanceof ZapierBindingError) {
     res.status(409).json({ error: error.message });
+    return;
+  }
+  if (error instanceof FieldCollectError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
     return;
   }
   if (error instanceof ZapierExecutionError) {
@@ -398,6 +403,27 @@ router.post(
           organizationId: req.member!.organizationId,
           invoiceId: z.string().uuid().parse(String(req.params.id)),
           actorUserId: req.member!.user.id,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+// Field collection: a tech texts the pay link for an invoice linked to their own assigned job.
+router.post(
+  "/integrations/zapier/flows/appointments/:appointmentId/invoices/:id/pay-link-text",
+  requireMember("payments.collect"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      z.object({}).strict().parse(req.body ?? {});
+      res.json(
+        await billRequestPayLinkText({
+          organizationId: req.member!.organizationId,
+          invoiceId: z.string().uuid().parse(String(req.params.id)),
+          actorUserId: req.member!.user.id,
+          field: { appointmentId: z.string().uuid().parse(String(req.params.appointmentId)), effectiveRole: req.member!.role },
         }),
       );
     } catch (error) {

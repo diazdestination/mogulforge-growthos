@@ -100,6 +100,16 @@ describe('client Zapier setup', () => {
     await screen.findByRole('button', { name: 'Save flow' });
   });
 
+  it('recommends Automatic only for the tap-sent field texts, without switching them on', async () => {
+    const onMyWay = { ...capability, key: 'appt.sms.on_my_way', label: 'Text On My Way', recommendedMode: 'auto', candidates: [{ app: 'OpenPhoneCLIAPI', appName: 'Quo', action: 'send_message', actionName: 'Send Message', configFields: [] }] };
+    const reminder = { ...capability, key: 'appt.sms.send', label: 'Text appointment reminders', recommendedMode: 'approve', candidates: onMyWay.candidates };
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (url: any, init?: RequestInit) => String(url).endsWith('/capabilities') ? response({ capabilities: [onMyWay, reminder] }) : base(url, init));
+    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    expect(await screen.findAllByText(/Recommended: Automatic/)).toHaveLength(1);
+    expect(screen.getAllByText(/Configured · Off|Select and configure a supported action/).length).toBeGreaterThan(0);
+  });
+
   it('shows supported app/action and missing setup guidance even before connection', async () => {
     connected = false;
     render(<ZapierConnectedAppsCard signUp={signUp} canManage />);

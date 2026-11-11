@@ -18,11 +18,13 @@ import {
   usersTable,
   zapierActionExecutionsTable,
   type InvoiceDocument,
+  type UserRole,
   type ZapierActionExecution,
 } from "@workspace/db";
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { companyDayBounds } from "@workspace/scheduling-core";
 
+import { hasPermission } from "../../lib/permissions";
 import { renderAppointmentReminderCopy } from "../appointment-reminder-copy";
 import { InvoiceError } from "../invoice-contract";
 import { createContact, createLead, createTask } from "../crm";
@@ -841,13 +843,21 @@ export async function buildPayLinkTextInput(
   invoiceId: string,
   actorUserId: string | null,
   expected?: { linkId: string; version: number; amountCents: number },
+  /** Field collection: the invoice must be linked to the requester's own assigned job (this one, or any current one when re-checking). */
+  field?: { appointmentId: string | null; effectiveRole?: UserRole },
 ) {
   if (!actorUserId) throw new ZapierExecutionError("A signed-in team member must request pay link texts.", "invalid_input");
   const { getInvoice } = await import("../invoices");
-  const invoice = await getInvoice(organizationId, actorUserId, invoiceId).catch((error: unknown) => {
+  const { readFieldInvoice, FieldCollectError } = await import("../field-collect");
+  const read = field
+    ? readFieldInvoice(db, organizationId, { userId: actorUserId, effectiveRole: field.effectiveRole }, invoiceId, field.appointmentId).then((result) => result.invoice)
+    : getInvoice(organizationId, actorUserId, invoiceId);
+  const invoice = await read.catch((error: unknown) => {
     if (error instanceof InvoiceError) {
       throw new ZapierExecutionError(error.status === 404 ? "Invoice not found." : error.message, error.status === 404 ? "not_found" : "invalid_input");
     }
+    // A queued text whose requester no longer has this job is stale, not a new authorization question.
+    if (error instanceof FieldCollectError && expected) throw new ZapierExecutionError(error.message, "invalid_input");
     throw error;
   });
   if (invoice.status !== "issued" || !invoice.invoiceNumber) {
@@ -895,8 +905,10 @@ export async function billRequestPayLinkText(input: {
   organizationId: string;
   invoiceId: string;
   actorUserId: string | null;
+  /** Set when a tech texts from My day; the invoice must be linked to this job assigned to them. */
+  field?: { appointmentId: string; effectiveRole?: UserRole };
 }): Promise<ZapierActionOutcome> {
-  const built = await buildPayLinkTextInput(input.organizationId, input.invoiceId, input.actorUserId);
+  const built = await buildPayLinkTextInput(input.organizationId, input.invoiceId, input.actorUserId, undefined, input.field);
   return requestZapierAction({
     organizationId: input.organizationId,
     capability: "bill.sms.payment_link",
@@ -955,7 +967,12 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Pay link text request is not rebuildable.", "invalid_input");
       const [link] = await db.select({ invoiceId: invoicePaymentLinksTable.invoiceId }).from(invoicePaymentLinksTable).where(and(eq(invoicePaymentLinksTable.organizationId, execution.organizationId), eq(invoicePaymentLinksTable.id, match[1]!)));
       if (!link) throw new ZapierExecutionError("The pay link is unavailable.", "invalid_input");
-      return (await buildPayLinkTextInput(execution.organizationId, link.invoiceId, execution.requestedByUserId, { linkId: match[1]!, version: Number(match[2]), amountCents: Number(match[3]) })).input;
+      // Re-read with the requester's authority: office invoice access, otherwise field collection on one of their current jobs.
+      const requester = execution.requestedByUserId
+        ? (await db.select({ role: usersTable.role }).from(usersTable).where(and(eq(usersTable.organizationId, execution.organizationId), eq(usersTable.id, execution.requestedByUserId))))[0]
+        : undefined;
+      const field = requester && !hasPermission(requester.role, "invoices.read") ? { appointmentId: null } : undefined;
+      return (await buildPayLinkTextInput(execution.organizationId, link.invoiceId, execution.requestedByUserId, { linkId: match[1]!, version: Number(match[2]), amountCents: Number(match[3]) }, field)).input;
     }
     case "maintain.sms.send": {
       const match = execution.idempotencyKey.match(MAINTAIN_REMINDER_KEY);

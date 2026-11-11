@@ -14,7 +14,8 @@ import { companyDayBounds } from "@workspace/scheduling-core";
 import { z } from "zod/v4";
 
 import { hasPermission } from "../lib/permissions";
-import { listInvoices } from "./invoices";
+import { linkedInvoiceIds, withinFieldWindow } from "./field-collect";
+import { readInvoiceDetail } from "./invoices";
 import { getZapierCapability } from "./zapier/zapier-capabilities";
 import { defaultPolicyFor, getZapierBinding, getZapierPolicy } from "./zapier/zapier-connection";
 import { APPT_ON_MY_WAY_ENTITY, companyDateOf } from "./zapier/zapier-specialist-flows";
@@ -22,8 +23,8 @@ import { APPT_ON_MY_WAY_ENTITY, companyDateOf } from "./zapier/zapier-specialist
 /**
  * The signed-in member's own field day: appointments assigned to them today
  * and the next few days, with what a tech needs at the door (who, where, how
- * to call, notes) and the customer's open invoice balance when the member may
- * read invoices. Read-only; every query is company-scoped.
+ * to call, notes) and the balance of invoices linked to the job when the member
+ * may read invoices or collect in the field. Read-only; every query is company-scoped.
  */
 
 export const myDayQuery = z.object({ date: z.iso.date().optional() }).strict();
@@ -59,7 +60,7 @@ export type MyDayJob = {
   propertyId: string | null;
   address: string | null;
   directionsUrl: string | null;
-  /** null when the member may not read invoices. */
+  /** Issued invoices linked to this job; null when the member may not see them here. */
   invoices: MyDayInvoice[] | null;
   onMyWay: { state: string; etaMinutes: number | null } | null;
 };
@@ -163,7 +164,7 @@ export async function getMyDay(
     : [];
 
   const canReadInvoices = hasPermission(actor.role, "invoices.read") && hasPermission(role, "invoices.read");
-  const canCollectPayments = hasPermission(actor.role, "invoices.manage") && hasPermission(role, "invoices.manage");
+  const canCollectPayments = hasPermission(actor.role, "payments.collect") && hasPermission(role, "payments.collect");
 
   const todayKeys = rows.map((row) => `appt-omw:${row.appointment.id}:${date}`);
   const onMyWayRows = todayKeys.length
@@ -179,25 +180,26 @@ export async function getMyDay(
         )
     : [];
 
-  const invoiceCache = new Map<string, MyDayInvoice[]>();
-  async function invoicesFor(leadId: string | null, contactId: string | null): Promise<MyDayInvoice[]> {
-    const key = leadId ? `lead:${leadId}` : contactId ? `contact:${contactId}` : "";
-    if (!key) return [];
-    if (!invoiceCache.has(key)) {
-      const list = await listInvoices(organizationId, userId, { status: "issued", ...(leadId ? { leadId } : { contactId: contactId! }) }, effectiveRole).catch(() => null);
-      invoiceCache.set(
-        key,
-        (list?.items ?? []).slice(0, 5).map((invoice) => ({
-          id: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
-          title: invoice.title,
-          totalCents: invoice.totalCents,
-          balanceDueCents: invoice.balanceDueCents,
-          paymentState: invoice.paymentState,
-        })),
-      );
+  // Invoices linked to each of my jobs (services/field-collect.ts). Office invoice readers see them
+  // for any of their own jobs; field collectors only inside the collection window.
+  async function invoicesFor(appointment: typeof appointmentsTable.$inferSelect): Promise<MyDayInvoice[] | null> {
+    const readAs = canReadInvoices ? undefined : canCollectPayments && withinFieldWindow(appointment.scheduledStart, now) ? ("payments.collect" as const) : null;
+    if (readAs === null) return null;
+    const ids = await linkedInvoiceIds(db, organizationId, appointment);
+    const items: MyDayInvoice[] = [];
+    for (const id of ids) {
+      const invoice = await readInvoiceDetail(db, organizationId, userId, id, { effectiveRole, readAs }).catch(() => null);
+      if (!invoice || invoice.status !== "issued") continue;
+      items.push({
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        title: invoice.title,
+        totalCents: invoice.totalCents,
+        balanceDueCents: invoice.balanceDueCents,
+        paymentState: invoice.paymentState,
+      });
     }
-    return invoiceCache.get(key)!;
+    return items;
   }
 
   const jobs: MyDayJob[] = [];
@@ -223,7 +225,7 @@ export async function getMyDay(
       propertyId: property?.id ?? null,
       address,
       directionsUrl: address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}` : null,
-      invoices: canReadInvoices ? await invoicesFor(appointment.leadId, contact?.id ?? null) : null,
+      invoices: await invoicesFor(appointment),
       onMyWay: omw ? { state: omw.state, etaMinutes: typeof eta === "number" ? eta : null } : null,
     });
   }

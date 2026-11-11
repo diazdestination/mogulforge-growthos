@@ -19,6 +19,8 @@ import { createInvoice, issueInvoice } from "./invoices";
 const ZONE = "America/Chicago";
 const DATE = "2026-11-11";
 const HOUR = 60 * 60_000;
+// The company's noon on DATE, so the field-collection window does not depend on when the suite runs.
+const NOON = new Date(Date.parse(companyDayBounds(DATE, ZONE).from) + 12 * HOUR);
 const orgs: string[] = [];
 afterAll(async () => {
   await deleteTestOrgs(...orgs);
@@ -56,8 +58,8 @@ describe("GET /contractor/my-day service", () => {
       linkedEntityType: "appointment_on_my_way", linkedEntityId: mine.id,
     });
 
-    const day = await getMyDay(f.orgId, f.tech.id, { date: DATE });
-    expect(day).toMatchObject({ organizationId: f.orgId, userId: f.tech.id, date: DATE, timeZone: ZONE, canReadInvoices: false, canCollectPayments: false, texting: { onMyWay: false, payLink: false } });
+    const day = await getMyDay(f.orgId, f.tech.id, { date: DATE }, undefined, NOON);
+    expect(day).toMatchObject({ organizationId: f.orgId, userId: f.tech.id, date: DATE, timeZone: ZONE, canReadInvoices: false, canCollectPayments: true, texting: { onMyWay: false, payLink: false } });
     expect(day.today.map((job) => job.id)).toEqual([mine.id]);
     expect(day.upcoming.map((job) => job.id)).toEqual([tomorrow.id]);
     expect(day.today[0]).toMatchObject({
@@ -66,7 +68,7 @@ describe("GET /contractor/my-day service", () => {
       address: "12 Oak St, Austin, TX 78701",
       directionsUrl: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent("12 Oak St, Austin, TX 78701")}`,
       notes: "Side gate code is with the office.",
-      invoices: null,
+      invoices: [],
       onMyWay: { state: "pending_approval", etaMinutes: 15 },
     });
     expect(day.upcoming[0]!.onMyWay).toBeNull();
@@ -80,11 +82,29 @@ describe("GET /contractor/my-day service", () => {
       document: { title: "Synthetic repair", currency: "USD", issuerName: "Synthetic My Day Co", customerName: "Dana Reyes", lineItems: [{ description: "Agreed work", quantity: "1", unitPriceCents: 25000 }], taxCents: 0 },
     })).invoice;
     const issued = (await issueInvoice(f.orgId, f.owner.id, draft.id, { requestId: randomUUID(), expectedVersion: draft.version, confirmed: true })).invoice;
-    const day = await getMyDay(f.orgId, f.owner.id, { date: DATE });
+    const day = await getMyDay(f.orgId, f.owner.id, { date: DATE }, undefined, NOON);
     expect(day).toMatchObject({ canReadInvoices: true, canCollectPayments: true });
     expect(day.today[0]!.invoices).toEqual([
       { id: issued.id, invoiceNumber: issued.invoiceNumber, title: "Synthetic repair", totalCents: 25000, balanceDueCents: 25000, paymentState: "unpaid" },
     ]);
+  });
+
+  it("shows a field tech the balance of the invoice linked to their own job only", async () => {
+    const f = await company();
+    const mine = await f.visit(f.tech.id, 9);
+    const [otherLead] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: f.contact.id }).returning();
+    const elsewhere = await f.visit(f.tech.id, 13, { leadId: otherLead!.id });
+    const draft = (await createInvoice(f.orgId, f.owner.id, {
+      requestId: randomUUID(), leadId: f.lead.id,
+      document: { title: "Synthetic repair", currency: "USD", issuerName: "Synthetic My Day Co", customerName: "Dana Reyes", lineItems: [{ description: "Agreed work", quantity: "1", unitPriceCents: 18000 }], taxCents: 0 },
+    })).invoice;
+    const issued = (await issueInvoice(f.orgId, f.owner.id, draft.id, { requestId: randomUUID(), expectedVersion: draft.version, confirmed: true })).invoice;
+    const day = await getMyDay(f.orgId, f.tech.id, { date: DATE }, undefined, NOON);
+    expect(day).toMatchObject({ canReadInvoices: false, canCollectPayments: true });
+    expect(day.today.find((job) => job.id === mine.id)!.invoices).toEqual([expect.objectContaining({ id: issued.id, balanceDueCents: 18000 })]);
+    expect(day.today.find((job) => job.id === elsewhere.id)!.invoices).toEqual([]);
+    // Outside the collection window the tech sees no balance.
+    expect((await getMyDay(f.orgId, f.tech.id, { date: DATE }, undefined, new Date(NOON.getTime() + 20 * 24 * HOUR))).today.find((job) => job.id === mine.id)!.invoices).toBeNull();
   });
 
   it("is tenant isolated and never shows a property owned by a different customer", async () => {

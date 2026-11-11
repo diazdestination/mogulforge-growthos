@@ -406,6 +406,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /integrations/zapier/flows/appointments/:id/reminder-text": "crm.write",
   "POST /integrations/zapier/flows/appointments/:id/on-my-way": "crm.write",
   "POST /integrations/zapier/flows/invoices/:id/pay-link-text": "invoices.manage",
+  "POST /integrations/zapier/flows/appointments/:appointmentId/invoices/:id/pay-link-text": "payments.collect",
   "POST /integrations/zapier/flows/services/:id/reminder-text": "crm.write",
   "POST /integrations/zapier/flows/invoices/:id/accounting": "invoices.manage",
   "POST /integrations/zapier/flows/sched/day-sheet": "crm.write",
@@ -427,6 +428,9 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /invoices/:id/payment-links/:linkId/qr": "invoices.read",
   "POST /invoices/:id/payment-links": "invoices.manage",
   "POST /invoices/:id/payment-links/:linkId/reconcile": "invoices.manage",
+  "GET /appointments/:appointmentId/invoices/:id/payment-links": "payments.collect",
+  "POST /appointments/:appointmentId/invoices/:id/payment-links": "payments.collect",
+  "GET /appointments/:appointmentId/invoices/:id/payment-links/:linkId/qr": "payments.collect",
   // SCHED route plan: read-only for members; filling map locations writes
   // property coordinates.
   "GET /route-plan": "crm.read",

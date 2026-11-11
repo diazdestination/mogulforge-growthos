@@ -51,6 +51,7 @@ const EXPECTED: Record<Permission, Role[]> = {
   "crm.delete": ["owner", "admin", "sales_manager"],
   "invoices.read": ["owner", "admin", "office", "sales_manager"],
   "invoices.manage": ["owner", "admin", "office"],
+  "payments.collect": ["owner", "admin", "office", "sales_rep", "inspector", "production"],
   "audit.read": ["owner", "admin"],
   "users.read": [...ALL_ROLES],
   "users.manage": ["owner", "admin"],
@@ -82,6 +83,7 @@ let fe: {
   canManageSettings: (role?: string | null) => boolean;
   canReadInvoices: (role?: string | null) => boolean;
   canManageInvoices: (role?: string | null) => boolean;
+  canCollectPayments: (role?: string | null) => boolean;
 };
 
 beforeAll(async () => {
@@ -176,6 +178,7 @@ describe("requireMember middleware enforces the matrix against real users", () =
     "settings.manage",
     "invoices.read",
     "invoices.manage",
+    "payments.collect",
   ];
 
   for (const permission of checkedPermissions) {
@@ -257,6 +260,9 @@ describe("frontend permission helpers stay in sync with server matrix", () => {
     it(`${role}: financial controls match server invoices.manage`, () => {
       expect(fe.canManageInvoices(role)).toBe(hasPermission(role, "invoices.manage"));
     });
+    it(`${role}: field collection matches server payments.collect`, () => {
+      expect(fe.canCollectPayments(role)).toBe(hasPermission(role, "payments.collect"));
+    });
   }
 
   it("frontend helpers deny everything for missing role", () => {
@@ -266,5 +272,6 @@ describe("frontend permission helpers stay in sync with server matrix", () => {
     expect(fe.canManageSettings(null)).toBe(false);
     expect(fe.canReadInvoices(null)).toBe(false);
     expect(fe.canManageInvoices(undefined)).toBe(false);
+    expect(fe.canCollectPayments(null)).toBe(false);
   });
 });

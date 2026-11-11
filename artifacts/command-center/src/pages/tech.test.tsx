@@ -111,7 +111,7 @@ describe("My day tech screen", () => {
     expect(screen.queryByRole("button", { name: "Send On My Way" })).toBeNull();
     cleanup();
     renderTech(day({ today: [job({ onMyWay: { state: "succeeded", etaMinutes: 15 } })] }), { path: "/tech?job=a1" });
-    expect(await screen.findByText("On My Way sent · about 15 minutes")).toBeTruthy();
+    expect(await screen.findByText("On My Way sent to Zapier · about 15 minutes")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Send On My Way" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -120,13 +120,13 @@ describe("My day tech screen", () => {
     const { calls } = renderTech(day(), {
       path: "/tech?job=a1",
       handler: (method, path) => {
-        if (path.endsWith("/invoices/i1/payment-links") && method === "GET") return json({ links });
-        if (path.endsWith("/invoices/i1/payment-links") && method === "POST") {
+        if (path.endsWith("/appointments/a1/invoices/i1/payment-links") && method === "GET") return json({ links });
+        if (path.endsWith("/appointments/a1/invoices/i1/payment-links") && method === "POST") {
           links = [{ id: "pl1", amountCents: 25000, url: "https://checkout.stripe.test/c/1", state: "open", expiresAt: new Date(Date.now() + 86_400_000).toISOString() }];
           return json({ link: links[0] }, 201);
         }
-        if (path.endsWith("/invoices/i1/payment-links/pl1/qr")) return json({ linkId: "pl1", url: "https://checkout.stripe.test/c/1", qrDataUrl: "data:image/png;base64,AAAA" });
-        if (path.endsWith("/flows/invoices/i1/pay-link-text") && method === "POST") return json({ execution: { state: "pending_approval" } });
+        if (path.endsWith("/appointments/a1/invoices/i1/payment-links/pl1/qr")) return json({ linkId: "pl1", url: "https://checkout.stripe.test/c/1", qrDataUrl: "data:image/png;base64,AAAA" });
+        if (path.endsWith("/flows/appointments/a1/invoices/i1/pay-link-text") && method === "POST") return json({ execution: { state: "succeeded" } });
         return undefined;
       },
     });
@@ -139,10 +139,10 @@ describe("My day tech screen", () => {
     expect(qr.getAttribute("src")).toBe("data:image/png;base64,AAAA");
     expect(within(section).getByRole("link", { name: "Open pay page on this phone" }).getAttribute("href")).toBe("https://checkout.stripe.test/c/1");
     fireEvent.click(within(section).getByRole("button", { name: "Text pay link" }));
-    expect(await within(section).findByText("Waiting for approval. Not sent yet.")).toBeTruthy();
+    expect(await within(section).findByText("Sent to Zapier. Your phone app sends it from your business number.")).toBeTruthy();
     expect(calls.filter((call) => call.method === "POST").map((call) => call.path.replace(/^.*\/api\/v1/, ""))).toEqual([
-      "/invoices/i1/payment-links",
-      "/integrations/zapier/flows/invoices/i1/pay-link-text",
+      "/appointments/a1/invoices/i1/payment-links",
+      "/integrations/zapier/flows/appointments/a1/invoices/i1/pay-link-text",
     ]);
   });
 
@@ -153,8 +153,33 @@ describe("My day tech screen", () => {
     expect(within(section).getByRole("link", { name: "Open invoices" }).getAttribute("href")).toBe("/invoices?leadId=l1");
     cleanup();
     renderTech(day({ canReadInvoices: false, canCollectPayments: false, today: [job({ invoices: null })] }), { path: "/tech?job=a1" });
-    expect(await screen.findByText(/Collecting payment needs invoice access/)).toBeTruthy();
+    expect(await screen.findByText(/needs field collection access/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Create pay link/ })).toBeNull();
+  });
+
+  it("lets a field tech without invoice access collect on their own job, scoped to that job", async () => {
+    const { calls } = renderTech(day({ canReadInvoices: false, canCollectPayments: true }), {
+      path: "/tech?job=a1",
+      handler: (method, path) => (path.endsWith("/appointments/a1/invoices/i1/payment-links") && method === "GET" ? json({ links: [] }) : undefined),
+    });
+    const section = await screen.findByRole("region", { name: "Collect payment" });
+    expect(await within(section).findByRole("button", { name: "Create pay link for $250.00" })).toBeTruthy();
+    expect(calls.some((call) => call.path.endsWith("/api/v1/appointments/a1/invoices/i1/payment-links"))).toBe(true);
+    expect(calls.some((call) => /\/api\/v1\/invoices\//.test(call.path))).toBe(false);
+    cleanup();
+    renderTech(day({ canReadInvoices: false, today: [job({ invoices: [] })] }), { path: "/tech?job=a1" });
+    const empty = await screen.findByRole("region", { name: "Collect payment" });
+    expect(within(empty).getByText(/No issued invoice with a balance is linked to this job/)).toBeTruthy();
+    expect(within(empty).queryByRole("link", { name: "Open invoices" })).toBeNull();
+  });
+
+  it("says Sent to Zapier when the tap goes straight out under the Automatic policy", async () => {
+    renderTech(day(), {
+      path: "/tech?job=a1",
+      handler: (method, path) => (method === "POST" && path.endsWith("/flows/appointments/a1/on-my-way") ? json({ execution: { state: "succeeded" } }) : undefined),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Send On My Way" }));
+    expect(await screen.findByText("Sent to Zapier. Your phone app sends it from your business number.")).toBeTruthy();
   });
 
   it("goes back to the list from a job", async () => {

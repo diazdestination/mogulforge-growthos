@@ -21,6 +21,8 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { encryptSecret } from "../../lib/token-encryption";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import { createInvoice, issueInvoice } from "../invoices";
+import { FieldCollectError } from "../field-collect";
+import { getZapierCapability } from "./zapier-capabilities";
 import { approveZapierAction } from "./zapier-executions";
 import { sha256Hex } from "./zapier-mcp-client";
 import {
@@ -134,12 +136,12 @@ async function fixture(options: { smsConsent?: boolean } = {}) {
   return { orgId: org!.id, owner: owner!, tech: tech!, contact: contact!, lead: lead!, appointment, invoice, payLink };
 }
 
-async function connect(org: string, capability: "appt.sms.on_my_way" | "bill.sms.payment_link", mode: "auto" | "approve" = "approve") {
+async function connect(org: string, capability: "appt.sms.on_my_way" | "bill.sms.payment_link", mode: "auto" | "approve" | null = "approve") {
   const url = `https://mcp.zapier.com/api/mcp/s/synthetic-field-${randomUUID()}/mcp`;
   const specialistId = capability.startsWith("appt") ? "appt" : "bill";
   await db.insert(zapierMcpConnectionsTable).values({ organizationId: org, encryptedServerUrl: encryptSecret(url, `${org}:zapier-mcp`), serverUrlFingerprint: sha256Hex(url), serverHost: "mcp.zapier.com", serverMode: "managed" }).onConflictDoNothing();
   await db.insert(zapierCapabilityBindingsTable).values({ organizationId: org, capability, specialistId, direction: "write", zapierApp: "OpenPhoneCLIAPI", zapierAppName: "Quo", zapierAction: "send_message", zapierActionName: "Send Message", bindingConfig: { from: "+14045550100" } });
-  await db.insert(zapierSpecialistPoliciesTable).values({ organizationId: org, capability, specialistId, mode, dailyBudget: 20 });
+  if (mode) await db.insert(zapierSpecialistPoliciesTable).values({ organizationId: org, capability, specialistId, mode, dailyBudget: 20 });
 }
 
 describe("APPT On My Way text", () => {
@@ -279,6 +281,83 @@ describe("BILL pay link text", () => {
     expect(fake.calls[0]).toMatchObject({ to_number: "+14045550142", body: expect.stringContaining("https://checkout.stripe.test/c/synthetic") });
     const again = await billRequestPayLinkText({ organizationId: f.orgId, invoiceId: invoice.id, actorUserId: f.owner.id });
     expect(again.execution.id).toBe(pending.execution.id);
+    expect(fake.calls).toHaveLength(1);
+  });
+});
+
+describe("tap-sent field texts: Automatic by default, Approve each still parks", () => {
+  const recommended = (key: "appt.sms.on_my_way" | "bill.sms.payment_link") => getZapierCapability(key)!.defaultMode;
+
+  it("defaults both field texts to Automatic, and leaves every other customer text on Approve each", () => {
+    expect(recommended("appt.sms.on_my_way")).toBe("auto");
+    expect(recommended("bill.sms.payment_link")).toBe("auto");
+    expect(getZapierCapability("appt.sms.send")!.defaultMode).toBe("approve");
+    expect(getZapierCapability("maintain.sms.send")!.defaultMode).toBe("approve");
+  });
+
+  it("sends a tech's On My Way tap straight to the phone app under the default policy; Approve each parks it", async () => {
+    const f = await fixture();
+    await connect(f.orgId, "appt.sms.on_my_way", recommended("appt.sms.on_my_way"));
+    const visit = await f.appointment();
+    const sent = await apptRequestOnMyWayText({ organizationId: f.orgId, appointmentId: visit.id, actorUserId: f.tech.id, etaMinutes: 10 });
+    expect(sent.execution.state).toBe("succeeded");
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]).toMatchObject({ to_number: "+14045550142", body: expect.stringContaining("about 10 minutes away") });
+    // Still one per appointment per day.
+    expect((await apptRequestOnMyWayText({ organizationId: f.orgId, appointmentId: visit.id, actorUserId: f.tech.id, etaMinutes: 10 })).execution.id).toBe(sent.execution.id);
+    expect(fake.calls).toHaveLength(1);
+
+    const approve = await fixture();
+    await connect(approve.orgId, "appt.sms.on_my_way", "approve");
+    const parked = await apptRequestOnMyWayText({ organizationId: approve.orgId, appointmentId: (await approve.appointment()).id, actorUserId: approve.tech.id });
+    expect(parked.execution.state).toBe("pending_approval");
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it("keeps consent and the owner's on/off choice: no consent or no policy chosen sends nothing", async () => {
+    const noConsent = await fixture({ smsConsent: false });
+    await connect(noConsent.orgId, "appt.sms.on_my_way", "auto");
+    await expect(apptRequestOnMyWayText({ organizationId: noConsent.orgId, appointmentId: (await noConsent.appointment()).id, actorUserId: noConsent.tech.id })).rejects.toMatchObject({ message: expect.stringMatching(/not agreed to receive texts/) });
+
+    const unchosen = await fixture();
+    await connect(unchosen.orgId, "appt.sms.on_my_way", null);
+    const blocked = await apptRequestOnMyWayText({ organizationId: unchosen.orgId, appointmentId: (await unchosen.appointment()).id, actorUserId: unchosen.tech.id });
+    expect(blocked.execution).toMatchObject({ state: "blocked", errorCode: "policy_off" });
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("lets a tech text the pay link for an invoice linked to their own job, straight out under the default policy", async () => {
+    const f = await fixture();
+    await connect(f.orgId, "bill.sms.payment_link", recommended("bill.sms.payment_link"));
+    const visit = await f.appointment();
+    const invoice = await f.invoice();
+    await f.payLink(invoice);
+    const sent = await billRequestPayLinkText({ organizationId: f.orgId, invoiceId: invoice.id, actorUserId: f.tech.id, field: { appointmentId: visit.id } });
+    expect(sent.execution).toMatchObject({ state: "succeeded", requestedByUserId: f.tech.id });
+    expect(fake.calls).toHaveLength(1);
+
+    // Someone else's job, or a job whose lead has no such invoice, is refused before anything is requested.
+    const [otherTech] = await db.insert(usersTable).values({ organizationId: f.orgId, role: "production", firstName: "Lee", emailVerifiedAt: new Date() }).returning();
+    await expect(billRequestPayLinkText({ organizationId: f.orgId, invoiceId: invoice.id, actorUserId: otherTech!.id, field: { appointmentId: visit.id } })).rejects.toBeInstanceOf(FieldCollectError);
+    const [otherLead] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: f.contact.id }).returning();
+    const unrelated = await f.appointment({ leadId: otherLead!.id });
+    await expect(billRequestPayLinkText({ organizationId: f.orgId, invoiceId: invoice.id, actorUserId: f.tech.id, field: { appointmentId: unrelated.id } })).rejects.toMatchObject({ status: 403, code: "field_invoice_not_linked" });
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it("re-checks a tech's queued pay link text against their jobs when the office approves it", async () => {
+    const f = await fixture();
+    await connect(f.orgId, "bill.sms.payment_link", "approve");
+    const visit = await f.appointment();
+    const invoice = await f.invoice();
+    await f.payLink(invoice);
+    const parked = await billRequestPayLinkText({ organizationId: f.orgId, invoiceId: invoice.id, actorUserId: f.tech.id, field: { appointmentId: visit.id } });
+    expect(parked.execution.state).toBe("pending_approval");
+    // Reassigning the job away from the tech makes the queued text stale.
+    await db.update(appointmentsTable).set({ assignedUserId: f.owner.id }).where(eq(appointmentsTable.id, visit.id));
+    await expect(approveZapierAction({ organizationId: f.orgId, executionId: parked.execution.id, userId: f.owner.id })).rejects.toMatchObject({ code: "invalid_input" });
+    await db.update(appointmentsTable).set({ assignedUserId: f.tech.id }).where(eq(appointmentsTable.id, visit.id));
+    expect((await approveZapierAction({ organizationId: f.orgId, executionId: parked.execution.id, userId: f.owner.id })).state).toBe("succeeded");
     expect(fake.calls).toHaveLength(1);
   });
 });

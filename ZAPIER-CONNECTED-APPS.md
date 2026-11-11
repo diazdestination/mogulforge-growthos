@@ -26,7 +26,8 @@ apps a contractor already uses, through the contractor's own Zapier account:
 
 Saving or changing a binding sets its policy Off. The client explicitly enables
 its policy afterward; Approve each is the recommended starting authority for
-customer texts. A registry's suggested mode does not activate a saved binding.
+customer texts, except the two tap-sent field texts below (Automatic). A
+registry's suggested mode does not activate a saved binding.
 
 ### Customer texts from the contractor's own number
 
@@ -68,8 +69,20 @@ keys on `bill-paylink-text:<link>:v<invoice version>:<balance cents>` and is
 rebuilt from the current open link and invoice balance; an expired, paid or
 replaced link, a changed balance, or missing invoice access refuses approval.
 Routes: `POST /integrations/zapier/flows/appointments/:id/on-my-way`
-(`crm.write`, body `{ etaMinutes?: 1-240 }`) and
-`POST /integrations/zapier/flows/invoices/:id/pay-link-text` (`invoices.manage`).
+(`crm.write`, body `{ etaMinutes?: 1-240 }`),
+`POST /integrations/zapier/flows/invoices/:id/pay-link-text` (`invoices.manage`)
+and, for a tech on their own job,
+`POST /integrations/zapier/flows/appointments/:appointmentId/invoices/:id/pay-link-text`
+(`payments.collect`; the invoice must be linked to that job, and approval re-checks
+that the job is still theirs).
+
+These two are fixed-copy texts that a person sends by tapping a button for one
+customer, so their registry default is Automatic: the tap is the approval. Like
+every flow they stay Off until the owner binds them and picks a policy in
+Settings; Settings recommends Automatic and the owner can choose Approve each
+(office approves every text) or Off. All other capabilities keep their defaults.
+Status on My day reads Sending, Sent to Zapier (the phone app accepted it, not
+that the customer read it) or Waiting for approval.
 
 CALLIE's existing phone-sync/text-back path is separate. The client action panel
 does not expose it while callback eligibility and customer-consent review are

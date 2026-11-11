@@ -396,7 +396,8 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     description: "APPT texts a consented customer that their technician is on the way, with an optional ETA, from the contractor's own number. Once per appointment per day.",
     inputSchema: ON_MY_WAY_SMS_INPUT,
     summaryFields: ["toPhone", "etaMinutes"],
-    defaultMode: "approve",
+    // A team member taps Send for one customer with fixed copy; that tap is the approval.
+    defaultMode: "auto",
     defaultDailyBudget: 60,
     candidates: [
       smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
@@ -411,7 +412,8 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     description: "BILL texts a consented customer the open sandbox pay link for an issued invoice's current balance, from the contractor's own number.",
     inputSchema: SMS_SEND_INPUT,
     summaryFields: ["toPhone"],
-    defaultMode: "approve",
+    // A team member taps Send for one customer with fixed copy; that tap is the approval.
+    defaultMode: "auto",
     defaultDailyBudget: 40,
     candidates: [
       smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
