@@ -559,6 +559,9 @@ export async function rejectZapierAction(input: {
   userId: string;
   reason?: string;
 }): Promise<ZapierActionExecution> {
+  // Same answer as approve for an id outside this company: not found, never
+  // "not pending", so the ledger of another company is not probed.
+  await readExecution(input.organizationId, input.executionId);
   const rejected = await transition(input.organizationId, input.executionId, ["pending_approval"], {
     state: "rejected",
     detail: (input.reason?.trim() || "Rejected by a human reviewer.").slice(0, 500),
