@@ -927,13 +927,14 @@ describe("SCOUT: pipeline & follow-up", () => {
     expect(reviews.body).toMatchObject({ received: 1, created: 1 });
     const tasks = (await get(f.office.sid, "/tasks")).body as unknown as Json[];
     expect(tasks.find((task) => String(task.title).includes("Sam Reviewer"))).toMatchObject({ title: "Respond to 2-star review from Sam Reviewer", priority: "high" });
-    // SCOUT only reads: two read calls, no writes, and no review-reply capability exists.
+    // The marketplace and review syncs only read: two read calls and no writes.
     expect(readCalls()).toHaveLength(2);
     expect(writeCalls()).toHaveLength(0);
     const capabilities = (await get(f.office.sid, "/integrations/zapier/capabilities")).body.capabilities as Json[];
     const scout = capabilities.filter((row) => (row.specialistId ?? row.specialist) === "scout");
     expect(scout.length).toBeGreaterThan(0);
-    expect(scout.every((row) => row.direction === "read")).toBe(true);
+    // SCOUT's only write is the staff-requested review *request* text; nothing can post a review reply.
+    expect(scout.filter((row) => row.direction === "write").map((row) => row.key ?? row.capability)).toEqual(["scout.sms.review_request"]);
     const other = await company("scout-zapier-other");
     expect(((await get(other.office.sid, "/tasks")).body as unknown as Json[])).toHaveLength(0);
   });
@@ -971,9 +972,12 @@ describe("Cross-cutting promises", () => {
     expect((await post(other.office.sid, `/integrations/zapier/executions/${parked.body.execution.id}/reject`, {})).status).toBe(404);
     // Every write capability starts switched off after binding: none can send unasked.
     const caps = (await get(f.owner.sid, "/integrations/zapier/capabilities")).body.capabilities as Json[];
-    expect(caps.filter((row) => row.direction === "write").map((row) => row.key ?? row.capability).sort()).toEqual(
-      ["appt.calendar.create_event", "appt.sms.send", "callie.sms.send", "invo.accounting.create_invoice", "maintain.sms.send", "sched.sms.send"],
-    );
+    const writes = caps.filter((row) => row.direction === "write");
+    expect(writes.map((row) => row.key ?? row.capability).sort()).toEqual([
+      "appt.calendar.create_event", "appt.sms.on_my_way", "appt.sms.send", "bill.sms.payment_link", "callie.sms.send", "esti.email.send",
+      "invo.accounting.create_invoice", "invo.accounting.record_payment", "invo.email.send", "maintain.sms.send", "sched.sms.send", "scout.sms.review_request",
+    ]);
+    expect(writes.filter((row) => (row.key ?? row.capability) !== "appt.sms.send").every((row) => (row.policy?.mode ?? "off") === "off")).toBe(true);
     const audits = await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "zapier.action_requested")));
     expect(audits.length).toBeGreaterThan(0);
   });
