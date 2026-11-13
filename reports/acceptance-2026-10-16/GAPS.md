@@ -1,5 +1,12 @@
 # Contractor acceptance gaps: prioritized fix list (October 16, 2026)
 
+**October 27 scope correction:** For CSS, the `OWNER-DEFERRED` G-01 labels below
+were based on superseded October 2 guidance. The October 9 private owner intake
+requires payment collection preparation for the switch; deposits, progress
+payments, financing and signed approval remain distinct requirements. This
+correction changes the scope classification, not the dated test results or any
+provider authority. Use [current CSS readiness](../css-onboarding-readiness-2026-10-27.md).
+
 This list comes from package C's local run of the 33 cases (`CASES.md`) and a
 read-only staging smoke. The private evidence is in
 `C:\Forge\artifacts\growthos-launch-claude-20261016\acceptance\`.

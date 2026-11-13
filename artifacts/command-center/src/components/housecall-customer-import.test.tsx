@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@workspace/api-client-react", () => ({ importLeadsCsv: vi.fn() }));
@@ -14,6 +14,47 @@ const upload = (name: string, body: string) =>
 afterEach(() => { cleanup(); vi.mocked(importLeadsCsv).mockReset(); vi.restoreAllMocks(); });
 
 describe("Housecall Pro customer import", () => {
+  it.each(["load", "error", "abort"])("ignores a superseded file read ending with %s", async (event) => {
+    const readers: FileReader[] = [];
+    vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (this: FileReader) {
+      readers.push(this);
+    });
+    vi.mocked(importLeadsCsv).mockResolvedValue(preview);
+    render(<HousecallCustomerImport onImported={vi.fn()} />);
+    upload("old.csv", csv);
+    const latestCsv = csv.replace("Smith, Jane", "Latest Customer");
+    upload("latest.csv", latestCsv);
+    await act(async () => {
+      Object.defineProperty(readers[1], "result", { value: latestCsv });
+      readers[1].dispatchEvent(new ProgressEvent("load"));
+    });
+    await act(async () => {
+      Object.defineProperty(readers[0], "result", { value: csv });
+      readers[0].dispatchEvent(new ProgressEvent(event));
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+    await waitFor(() => expect(importLeadsCsv).toHaveBeenCalledWith(expect.objectContaining({
+      fileName: "latest.csv", csv: latestCsv, dryRun: true,
+    })));
+  });
+
+  it("does not restore a pending CSV after a replacement is rejected", async () => {
+    let pendingReader: FileReader;
+    vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (this: FileReader) {
+      pendingReader = this;
+    });
+    render(<HousecallCustomerImport onImported={vi.fn()} />);
+    upload("old.csv", csv);
+    upload("replacement.xlsx", "binary");
+    await act(async () => {
+      Object.defineProperty(pendingReader!, "result", { value: csv });
+      pendingReader!.dispatchEvent(new ProgressEvent("load"));
+    });
+    expect(screen.queryByRole("button", { name: "Preview import" })).toBeNull();
+    expect(importLeadsCsv).not.toHaveBeenCalled();
+  });
+
   it("shows a safe error for malformed CSV and never offers a preview", async () => {
     render(<HousecallCustomerImport onImported={vi.fn()} />);
     upload("customers.csv", 'First,Email\n"Ann","ann@example.invalid\nBob,bob@example.invalid\n');
