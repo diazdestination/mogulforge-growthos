@@ -161,13 +161,16 @@ export function admitManifest(
     "attestation_window",
   );
   check(
-    a.schema?.tables === 142 &&
-      a.schema.columns === 1870 &&
-      hex(a.schema.catalogSha256, 64) &&
-      (local
-        ? a.schema.database === "postgres"
-        : a.schema.database === "growthos_staging" &&
-          a.schema.cluster === "zp2wjrejd2zodn4q"),
+    local
+      ? a.schema?.database === "postgres" &&
+        a.schema.tables === 150 &&
+        a.schema.columns === 2004 &&
+        a.schema.catalogSha256 === "92a06a784d8d90539e17c6f1558d69d2df46d16fff2b22a652f970b0e3a8ce0b"
+      : a.schema?.database === "growthos_staging" &&
+        a.schema.cluster === "zp2wjrejd2zodn4q" &&
+        a.schema.tables === 142 &&
+        a.schema.columns === 1870 &&
+        hex(a.schema.catalogSha256, 64),
     "attestation_schema",
   );
   check(

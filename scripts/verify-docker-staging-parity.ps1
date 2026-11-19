@@ -43,6 +43,33 @@ function Invoke-ComposeChecked {
   Invoke-Checked $Label { & docker @composePrefix @Arguments }
 }
 
+function Assert-ParityDatabaseIdentity {
+  param(
+    [string]$Database,
+    [string]$SessionUser,
+    [switch]$ExpectRefusal
+  )
+
+  # Capture native output so a failed container cannot print connection details.
+  $PSNativeCommandUseErrorActionPreference = $false
+  $preflightArguments = @(
+    'run', '--rm', '-T',
+    '-e', "GROWTHOS_PREFLIGHT_EXPECTED_DATABASE=$Database",
+    '-e', "GROWTHOS_PREFLIGHT_EXPECTED_SESSION_USER=$SessionUser",
+    'schema', 'pnpm', '--dir', '/app', '--filter', '@workspace/scripts',
+    'exec', 'tsx', '/app/scripts/beta-schema-preflight.mjs'
+  )
+  $output = & docker @composePrefix @preflightArguments 2>&1
+  $exitCode = $LASTEXITCODE
+  if ($ExpectRefusal) {
+    if ($exitCode -eq 0 -or -not ($output -cmatch '^Beta schema preflight refused deployment\.')) {
+      throw 'Parity expected a redacted database identity refusal.'
+    }
+  } elseif ($exitCode -ne 0 -or -not ($output -cmatch '^Beta database identity and schema column checks passed\.')) {
+    throw 'Parity failed to admit the restricted application database identity.'
+  }
+}
+
 function Get-ParityReadiness {
   $elapsed = [System.Diagnostics.Stopwatch]::StartNew()
   $response = Invoke-WebRequest -Uri "$baseUrl/api/readyz" -SkipHttpErrorCheck -TimeoutSec 5
@@ -128,6 +155,11 @@ try {
     throw "Required identity tables were not created; found '$requiredTables'."
   }
 
+  Write-Host "`n== Verify database identity admission on isolated PostgreSQL ==" -ForegroundColor Cyan
+  Assert-ParityDatabaseIdentity -Database 'growthos_parity' -SessionUser 'growthos_app'
+  Assert-ParityDatabaseIdentity -Database 'wrong_database' -SessionUser 'growthos_app' -ExpectRefusal
+  Assert-ParityDatabaseIdentity -Database 'growthos_parity' -SessionUser 'wrong_login' -ExpectRefusal
+
   Invoke-ComposeChecked 'Start production image after schema reconciliation' @('up', '-d', 'app')
 
   $health = $null
@@ -188,6 +220,7 @@ try {
   Write-Host "`nDOCKER_STAGING_PARITY_PASSED" -ForegroundColor Green
   Write-Host 'Schema push succeeded under restricted ownership.'
   Write-Host 'Fly-like pg_stat_monitor ownership was preserved.'
+  Write-Host 'Beta preflight admitted the restricted database identity and refused both mismatch cases.'
   Write-Host 'Production image health and public identity routes passed.'
   Write-Host 'Readiness/release identity, isolated database failure, and recovery passed.'
 } finally {

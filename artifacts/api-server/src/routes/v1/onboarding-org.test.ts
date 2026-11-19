@@ -159,6 +159,12 @@ describe("self-serve org creation", () => {
       .where(eq(usersTable.id, u.id));
     expect(user.organizationId).toBe(body.organization.id);
     expect(user.role).toBe("owner");
+    expect(user.isPlatformAdmin).toBe(false);
+    const platform = await authed(sid)("/api/v1/platform/orgs");
+    expect(platform.status).toBe(403);
+    expect(await platform.json()).toMatchObject({
+      error: "Platform admin access required",
+    });
 
     // Fresh org: no roofing copy, no borrowed Painless branding, anywhere in
     // its effective settings or seeded playbook.

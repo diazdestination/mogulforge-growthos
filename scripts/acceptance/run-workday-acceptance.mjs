@@ -1,6 +1,7 @@
 // Package C contractor acceptance: automated workday chain for each TEST company.
 //
-//   BASE_URL=http://127.0.0.1:4192 node scripts/acceptance/acceptance-runtime.mjs --run
+//   $env:GROWTHOS_ACCEPTANCE_EVIDENCE_ROOT = Join-Path (Resolve-Path C:/Forge/artifacts) ("acceptance-" + [guid]::NewGuid())
+//   node scripts/acceptance/acceptance-runtime.mjs --run
 //
 // LOCAL: the disposable runtime supplies its manifest and credentials in memory.
 // STAGING: see reports/acceptance-2026-10-16/STAGING-RUN.md (BASE_URL,

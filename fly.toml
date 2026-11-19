@@ -13,15 +13,19 @@ kill_timeout = 30
 
 # The beta schema is provisioned separately on the confirmed fresh database.
 # The retired release-schema.mjs deliberately refuses automatic reconciliation.
-# Check current columns without altering schema or data before admitting deploy.
+# Check database identity and current columns before admitting deploy.
 [deploy]
   release_command = "pnpm --filter @workspace/scripts exec tsx /app/scripts/beta-schema-preflight.mjs"
 
 [env]
   APP_ORIGIN = 'https://app.mogulforge.ai'
+  GROWTHOS_OUTBOUND_HOLD = 'true'
+  GROWTHOS_PREFLIGHT_EXPECTED_DATABASE = 'growthos_beta_20261111'
+  GROWTHOS_PREFLIGHT_EXPECTED_SESSION_USER = 'growthos-beta-20261111'
   NODE_ENV = 'production'
   OBJECT_STORAGE_PROVIDER = 'postgres'
   PORT = '3001'
+  SCHEDULER_AUTOSTART = 'false'
   STATIC_DIR = '/app/public'
 
 [http_service]
@@ -29,9 +33,8 @@ kill_timeout = 30
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  # Keep one scheduler alive in iad even when no browser is open.
-  # Prepared configuration only; applying it requires approved deployment/cost.
-  min_machines_running = 1
+  # Allow the supervised beta health-check machine to stop when idle.
+  min_machines_running = 0
 
 [[vm]]
   size = 'shared-cpu-1x'

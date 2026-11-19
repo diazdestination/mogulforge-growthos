@@ -104,7 +104,7 @@ test("safe evidence projection excludes response payloads and credential-bearing
   assert.equal(out.apiStatus, 200);
   assert.equal(JSON.stringify(out).includes("DO_NOT_KEEP"), false);
 });
-test("actual API wrapper rechecks session identity and blocks a later actor switch", async () => {
+async function admittedBrowser() {
   const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
     now = Date.parse("2026-10-16T20:00:00Z"),
     source = { commit: "a".repeat(40), tree: "b".repeat(40), clean: true };
@@ -138,9 +138,9 @@ test("actual API wrapper rechecks session identity and blocks a later actor swit
     release,
     schema: {
       database: "postgres",
-      tables: 142,
-      columns: 1870,
-      catalogSha256: "f".repeat(64),
+      tables: 150,
+      columns: 2004,
+      catalogSha256: "92a06a784d8d90539e17c6f1558d69d2df46d16fff2b22a652f970b0e3a8ce0b",
     },
     holds: {
       outbound: true,
@@ -163,6 +163,12 @@ test("actual API wrapper rechecks session identity and blocks a later actor swit
     attestation,
     attestationSha256: semanticHash(attestation),
   };
+  for (const drift of [{ tables: 149 }, { columns: 2005 }, { catalogSha256: "a".repeat(64) }]) {
+    const changed = structuredClone(manifest);
+    Object.assign(changed.attestation.schema, drift);
+    changed.attestationSha256 = semanticHash(changed.attestation);
+    assert.throws(() => admitManifest(changed, { origin: lib.BASE_URL, source, now }), /attestation_schema/);
+  }
   const admission = admitManifest(manifest, {
     origin: lib.BASE_URL,
     source,
@@ -208,17 +214,67 @@ test("actual API wrapper rechecks session identity and blocks a later actor swit
     },
   };
   await lib.preflightPage(page, c, staff);
+  return { page, c, staff, id, now, admission, actor: value => { currentId = value; },
+    release: value => { liveRelease = value; }, html: value => { liveHtml = value; }, mutations: () => mutations };
+}
+test("actual API wrapper rechecks session identity and blocks a later actor switch", async () => {
+  const f = await admittedBrowser(), { page, id, staff } = f;
   await lib.api(page, "PUT", "/api/v1/staff-push/policy", {});
-  assert.equal(mutations, 1);
-  currentId = id(999);
+  assert.equal(f.mutations(), 1);
+  f.actor(id(999));
   await assert.rejects(lib.api(page, "PUT", "/api/v1/staff-push/policy", {}));
-  assert.equal(mutations, 1);
-  currentId = staff.id;
-  liveRelease = { ...release, sha: "0".repeat(40) };
+  assert.equal(f.mutations(), 1);
+  f.actor(staff.id);
+  f.release({ ...f.admission.manifest.attestation.release, sha: "0".repeat(40) });
   await assert.rejects(lib.api(page, "PUT", "/api/v1/staff-push/policy", {}));
-  assert.equal(mutations, 1);
-  liveRelease = release;
-  liveHtml = Buffer.from("unreviewed frontend");
+  assert.equal(f.mutations(), 1);
+  f.release(f.admission.manifest.attestation.release);
+  f.html(Buffer.from("unreviewed frontend"));
   await assert.rejects(lib.api(page, "PUT", "/api/v1/staff-push/policy", {}));
-  assert.equal(mutations, 1);
+  assert.equal(f.mutations(), 1);
+});
+
+test.each(["valid", "foreign", "different object", "extra query", "wrong bytes", "actor changed", "admission replaced", "expired", "redirect", "wrong media"])("guarded loopback photo upload: %s", async scenario => {
+  const f = await admittedBrowser();
+  let handler, instant = f.now;
+  lib.configureExecution(f.admission, { now: () => instant });
+  await lib.installContextGuard({route: async (_, callback) => {handler = callback;}});
+  const visit = f.id(41), entry = f.id(42), object = f.id(43), requestId = f.id(44), photoId = f.id(45);
+  const bytes = Buffer.from("synthetic fixture");
+  const type = "image/png";
+  const routePath = "/api/v1/appointments/" + visit + "/work/entries/" + entry + "/photos/request-url";
+  const signedPath = "/api/v1/public/uploads/local/" + object + "?token=test.fixture";
+  await lib.expectLocalVisitPhoto(f.page, { appointmentId: visit, entryId: entry, bytes, contentType: type });
+  const response = {organizationId:f.c.organizationId, receipt:{requestId,replayed:false}, photoId,
+    uploadExpiresAt:new Date(instant + 1000).toISOString(), uploadUrl:signedPath,
+    work:{organizationId:f.c.organizationId,appointment:{id:visit},entries:[{id:entry,photos:[{id:photoId,entryId:entry,state:"reserved",contentType:type,sizeBytes:bytes.length}]}]}};
+  let transmitted = 0;
+  async function invoke(url, method, contentType, data, status = 200) {
+    let outcome;
+    const req = { url:()=>url, method:()=>method, frame:()=>({page:()=>f.page}), headers:()=>({"content-type":contentType}),
+      postDataJSON:()=>({requestId,contentType:type,sizeBytes:bytes.length}), postDataBuffer:()=>data };
+    await handler({request:()=>req, continue:()=>{outcome="continue";},abort:()=>{outcome="abort";},fulfill:()=>{outcome="fulfill";},
+      fetch:async opts=>{assert.equal(opts.maxRedirects,0);if(method==="PUT")transmitted++;return {status:()=>status,json:async()=>response};}});
+    return outcome;
+  }
+  assert.equal(await invoke(lib.BASE_URL + routePath,"POST","application/json"),"fulfill");
+  let url = lib.BASE_URL + signedPath, data = bytes, media = type;
+  if(scenario==="foreign")url=url.replace("127.0.0.1","example.invalid");
+  if(scenario==="different object")url=url.replace(object,f.id(49));
+  if(scenario==="extra query")url+="&extra=1";
+  if(scenario==="wrong bytes")data=Buffer.alloc(bytes.length);
+  if(scenario==="actor changed")f.actor(f.id(99));
+  if (scenario === "admission replaced") {
+    const replacement = admitManifest(f.admission.manifest, {
+      origin: lib.BASE_URL, source: f.admission.manifest.source, now: instant,
+    });
+    assert.notEqual(replacement, f.admission);
+    lib.configureExecution(replacement, { now: () => instant });
+  }
+  if(scenario==="expired")instant+=1001;
+  if(scenario==="wrong media")media="image/jpeg";
+  const valid=scenario==="valid";
+  assert.equal(await invoke(url,"PUT",media,data,scenario==="redirect"?307:201),valid?"fulfill":"abort");
+  assert.equal(transmitted,valid||scenario==="redirect"?1:0);
+  if(valid)assert.equal(await invoke(url,"PUT",media,data),"abort");
 });
