@@ -70,6 +70,10 @@ export const ORIGIN = `http://127.0.0.1:${PORT}`;
 export const EVIDENCE_DIR = EVIDENCE_ROOT;
 const source = sourceBinding();
 if (!source.clean) throw Error("local_runtime_requires_committed_clean_source");
+// Claim a fresh directory before starting any local services.
+if (!process.env.GROWTHOS_ACCEPTANCE_EVIDENCE_ROOT || !path.isAbsolute(EVIDENCE_DIR))
+  throw Error("Set GROWTHOS_ACCEPTANCE_EVIDENCE_ROOT to a new absolute directory");
+await mkdir(EVIDENCE_DIR);
 const runId = randomUUID(),
   siteSecrets = new Map(),
   staffSecrets = new Map();
@@ -283,7 +287,8 @@ const socket = new PGLiteSocketServer({
   maxConnections: 20,
 });
 let child;
-const cacheRoot = path.join(api, "node_modules/.cache");
+// Express history fallback rejects absolute paths beneath dot-directories.
+const cacheRoot = path.join(api, "node_modules");
 await mkdir(cacheRoot, { recursive: true });
 const buildDir = await mkdtemp(path.join(cacheRoot, "acceptance-runtime-"));
 try {
@@ -430,7 +435,6 @@ try {
   }
   if (!healthy) throw new Error("Acceptance runtime did not become healthy");
   const companies = await provisionTestCompanies(env.DATABASE_URL);
-  await mkdir(EVIDENCE_DIR, { recursive: true });
   const catalogClient = new pg.Client({ connectionString: env.DATABASE_URL });
   await catalogClient.connect();
   let columns, tables;
@@ -487,7 +491,7 @@ try {
     runId,
     origin: ORIGIN,
     preparedAt: observedAt,
-    expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    expiresAt: new Date(Date.parse(observedAt) + 15 * 60_000).toISOString(),
     reviewedBy: "ROOT",
     source,
     companies,

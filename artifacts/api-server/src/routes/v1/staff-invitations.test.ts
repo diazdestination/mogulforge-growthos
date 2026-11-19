@@ -467,7 +467,7 @@ describe("staff invitations through normal authenticated HTTP", () => {
     expect(JSON.stringify(audit)).not.toContain(token(input.email));
   });
 
-  it("accepts the signed invitation into its exact organization and keeps other memberships unchanged", async () => {
+  it("accepts the signed invitation as an owner with access scoped to its exact organization", async () => {
     const input = fixture(),
       { invitation } = await create(input, foreignOrg);
     const response = await request("", "/auth/register", {
@@ -483,7 +483,23 @@ describe("staff invitations through normal authenticated HTTP", () => {
     expect(accepted.id).not.toMatch(/^invite:/);
     expect(accepted.organizationId).toBe(foreignOrg);
     expect(accepted.role).toBe("owner");
+    expect(accepted.isPlatformAdmin).toBe(false);
     expect(accepted.emailVerifiedAt).toBeTruthy();
+
+    const cookie = response.headers.get("set-cookie")?.split(";")[0];
+    expect(cookie).toMatch(/^sid=[^;]+$/);
+    const headers = { cookie: cookie! };
+    const members = await fetch(`${base}/api/v1/users`, { headers });
+    expect(members.status).toBe(200);
+    expect(await members.json()).toEqual([
+      expect.objectContaining({ id: accepted.id, role: "owner" }),
+    ]);
+    const platform = await fetch(`${base}/api/v1/platform/orgs`, { headers });
+    expect(platform.status).toBe(403);
+    expect(await platform.json()).toMatchObject({
+      error: "Platform admin access required",
+    });
+
     expect(await ledger(invitation.id)).toMatchObject({
       state: "accepted",
       acceptedUserId: accepted.id,

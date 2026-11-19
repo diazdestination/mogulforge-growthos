@@ -5,4 +5,7 @@
 *.log
 pnpm-workspace.yaml.bak
 **/.env
+# Local credentials and agent coordination receipts are never image inputs.
+**/.local
+**/.superpowers
 /work

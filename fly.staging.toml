@@ -11,7 +11,8 @@ kill_timeout = 30
   dockerfile = 'Dockerfile'
 
 [deploy]
-  release_command = "node /app/scripts/release-schema.mjs"
+  # Check the confirmed staging database without altering schema or data.
+  release_command = "pnpm --filter @workspace/scripts exec tsx /app/scripts/beta-schema-preflight.mjs"
 
 [env]
   APP_ORIGIN = 'https://mogulforge-growthos-staging.fly.dev'

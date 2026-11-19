@@ -17,6 +17,7 @@ import {
 } from "./guards.mjs";
 
 export const EVIDENCE_DIR =
+  process.env.GROWTHOS_ACCEPTANCE_EVIDENCE_ROOT ??
   "C:/Forge/artifacts/growthos-launch-codex-20261016/acceptance-guardfix";
 export const BASE_URL = (
   process.env.BASE_URL ?? "http://127.0.0.1:4192"
@@ -356,6 +357,72 @@ export async function preflightPage(page, company, staff) {
   pages.set(page, { key: company.key, staffId: staff.id, token, observation });
   return token;
 }
+const photoExpectations = new WeakMap();
+const fixtureUuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const objectUpload = /^\/api\/v1\/public\/uploads\/local\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\?token=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/i;
+
+// Explicit local browser rehearsal only. The trusted caller supplies fixture bytes
+// before the form generates a request ID or the server issues an upload URL.
+export async function expectLocalVisitPhoto(page, { appointmentId, entryId, bytes, contentType }) {
+  if (execution?.origin !== "http://127.0.0.1:4192" ||
+      execution.manifest.attestation.kind !== "LOCAL_RUNTIME_READ_ONLY" ||
+      !fixtureUuid.test(appointmentId) || !fixtureUuid.test(entryId) ||
+      contentType !== "image/png" || !Buffer.isBuffer(bytes) ||
+      !bytes.length || bytes.length > 10 * 1024 * 1024 || photoExpectations.has(page))
+    throw Error("local_photo_expectation");
+  const token = await recheckSession(page);
+  photoExpectations.set(page, {
+    token, appointmentId, entryId, contentType, size: bytes.length, digest: hash(bytes),
+    reservation: execution.origin + "/api/v1/appointments/" + appointmentId +
+      "/work/entries/" + entryId + "/photos/request-url",
+    phase: "waiting",
+  });
+}
+
+async function handleLocalPhoto(route, page, token, request, expectation) {
+  const url = request.url(), method = request.method();
+  if (expectation.token !== token || token.admission !== execution) throw Error("local_photo_actor");
+  if (url === expectation.reservation && method === "POST") {
+    assertMutation({ admission: execution, token, url, method, now: clock() });
+    if (expectation.phase !== "waiting") throw Error("local_photo_reservation_used");
+    expectation.phase = "reserving";
+    const body = request.postDataJSON();
+    if (!fixtureUuid.test(body?.requestId) || body.contentType !== expectation.contentType ||
+        body.sizeBytes !== expectation.size) throw Error("local_photo_request");
+    const response = await route.fetch({ maxRedirects: 0 });
+    if (response.status() < 200 || response.status() >= 300) throw Error("local_photo_reservation");
+    const saved = await response.json();
+    const entry = saved.work?.entries?.find(e => e.id === expectation.entryId);
+    const photo = entry?.photos?.find(p => p.id === saved.photoId);
+    const expires = Date.parse(saved.uploadExpiresAt);
+    if (!fixtureUuid.test(saved.photoId) || saved.organizationId !== token.organizationId ||
+        saved.work?.organizationId !== token.organizationId ||
+        saved.work?.appointment?.id !== expectation.appointmentId ||
+        saved.receipt?.requestId !== body.requestId || saved.receipt.replayed !== false ||
+        !photo || photo.entryId !== expectation.entryId || photo.state !== "reserved" ||
+        photo.contentType !== expectation.contentType || photo.sizeBytes !== expectation.size ||
+        !Number.isFinite(expires) || expires <= clock() || !objectUpload.test(saved.uploadUrl))
+      throw Error("local_photo_response");
+    expectation.upload = execution.origin + saved.uploadUrl;
+    expectation.expires = Math.min(expires, execution.expiresAt);
+    expectation.phase = "reserved";
+    await route.fulfill({ response });
+    return true;
+  }
+  if (expectation.phase !== "reserved" || url !== expectation.upload) return false;
+  photoExpectations.delete(page);
+  const bytes = request.postDataBuffer();
+  if (method !== "PUT" || clock() >= expectation.expires ||
+      request.headers()["content-type"] !== expectation.contentType ||
+      !bytes || bytes.length !== expectation.size || hash(bytes) !== expectation.digest)
+    throw Error("local_photo_upload");
+  // Consume before issuing the request. Never follow a redirect or retry bytes.
+  const response = await route.fetch({ maxRedirects: 0 });
+  if (response.status() !== 201) throw Error("local_photo_unconfirmed");
+  await route.fulfill({ response });
+  return true;
+}
+
 export async function installContextGuard(context) {
   assertAdmission(execution, clock());
   await context.route("**/*", async (route) => {
@@ -368,6 +435,8 @@ export async function installContextGuard(context) {
         const page = request.frame().page();
         if (u.pathname !== "/api/auth/login" || pages.has(page)) {
           const token = await recheckSession(page);
+          const expectation = photoExpectations.get(page);
+          if (expectation && await handleLocalPhoto(route, page, token, request, expectation)) return;
           assertMutation({
             admission: execution,
             token,
