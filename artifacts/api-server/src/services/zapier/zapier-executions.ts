@@ -1,3 +1,4 @@
+import { withZapierOrgTransaction, managedMetadata, monthlyStarted } from "./zapier-credential-metadata";
 import {
   db,
   zapierActionExecutionsTable,
@@ -263,7 +264,7 @@ export async function requestZapierAction(request: ZapierActionRequest): Promise
     return { execution: inserted.execution };
   }
   if (inserted.execution.state !== "executing") return { execution: inserted.execution };
-  return execute(inserted.execution, prepared, request.requestedByUserId ?? null);
+  return execute(inserted.execution, prepared, request.input, request.requestedByUserId ?? null);
 }
 
 async function insertOrReuse(
@@ -320,7 +321,7 @@ async function insertOrReuse(
       linkedEntityType: request.linkedEntityType ?? null,
       linkedEntityId: request.linkedEntityId ?? null,
       requestedByUserId: request.requestedByUserId ?? null,
-      startedAt: values.state === "executing" ? new Date() : null,
+      startedAt: null,
       completedAt: values.state === "blocked" ? new Date() : null,
     })
     .onConflictDoNothing()
@@ -349,7 +350,7 @@ async function insertOrReuse(
         state: values.state,
         detail: values.detail,
         errorCode: null,
-        startedAt: values.state === "executing" ? new Date() : null,
+        startedAt: null,
         completedAt: null,
       })
       .where(and(eq(zapierActionExecutionsTable.id, existing.id), eq(zapierActionExecutionsTable.state, "blocked")))
@@ -365,6 +366,7 @@ async function insertOrReuse(
 async function execute(
   execution: ZapierActionExecution,
   prepared: PreparedRequest,
+  input: unknown,
   actorUserId: string | null,
 ): Promise<ZapierActionOutcome> {
   const { organizationId } = execution;
@@ -401,7 +403,7 @@ async function execute(
       return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
     }
     serverUrl = resolved.serverUrl;
-    serverMode = resolved.connection.serverMode;
+    serverMode = managedMetadata(resolved.connection.serverUrlFingerprint) ? "agentic" : resolved.connection.serverMode;
   } catch (error) {
     const blocked = await transition(organizationId, execution.id, ["executing"], {
       state: "blocked",
@@ -437,7 +439,40 @@ async function execute(
   let failure: ZapierMcpError | null = null;
   let stoppedCode: string | null = null;
 
-  const callZapier = async (): Promise<{ state: "succeeded" | "blocked"; detail: string }> => {
+  const callZapier = () => withZapierOrgTransaction(organizationId, async (tx): Promise<{ state: "succeeded" | "blocked"; detail: string }> => {
+    const currentConnection = await getZapierConnection(organizationId, tx);
+    if (!currentConnection || currentConnection.serverUrlFingerprint !== prepared.serverFingerprint) {
+      stoppedCode = "stale_request";
+      return { state: "blocked", detail: "Connection changed before dispatch." };
+    }
+    const latest = await prepareRequest(organizationId, execution.capability, input, tx);
+    if ("blocked" in latest || latest.requestDigest !== execution.requestDigest) {
+      stoppedCode = "stale_request";
+      return { state: "blocked", detail: "The app binding changed before dispatch." };
+    }
+    const policy = await getZapierPolicy(organizationId, execution.capability, tx);
+    if (!policy || policy.mode === "off" || policy.dailyBudget <= 0) {
+      stoppedCode = "policy_off";
+      return { state: "blocked", detail: "This flow was switched off before dispatch." };
+    }
+    if (policy.mode === "approve" && prepared.definition.direction === "write" &&
+        (!execution.approvedAt || !execution.approvedByUserId)) {
+      stoppedCode = "approval_required";
+      return { state: "blocked", detail: "This flow now requires a human approval." };
+    }
+    if (await usedToday(organizationId, execution.capability, tx) > policy.dailyBudget) {
+      stoppedCode = "budget_exhausted";
+      return { state: "blocked", detail: "The current daily allowance is exhausted." };
+    }
+    const now = new Date();
+    const metadata = managedMetadata(currentConnection.serverUrlFingerprint);
+    if (metadata && await monthlyStarted(tx, organizationId, now) >= metadata.monthlyActionLimit) {
+      stoppedCode = "monthly_limit";
+      return { state: "blocked", detail: "The client monthly action limit has been reached." };
+    }
+    // Commit the reservation before network dispatch, including unknown outcomes.
+    await db.update(zapierActionExecutionsTable).set({ startedAt: now }).where(and(
+      eq(zapierActionExecutionsTable.organizationId, organizationId), eq(zapierActionExecutionsTable.id, execution.id)));
     if (OWNED_APP_DISPATCH_RECHECK.has(execution.capability)) {
       // Re-derive from current GrowthOS records right before dispatch, so a
       // change after approval (or an auto request racing an edit) never sends
@@ -496,7 +531,7 @@ async function execute(
       if (failure.indeterminate) throw failure; // durable kernel records indeterminate
       return { state: "blocked", detail: failure.message };
     }
-  };
+  });
 
   let finalState: ZapierExecutionState;
   let detail: string;
@@ -526,7 +561,7 @@ async function execute(
   }
 
   if (execution.capability === "maintain.sms.send" && finalState === "succeeded") await acceptContactTouch(organizationId, `zapier:${execution.id}`);
-  await markZapierConnectionUsed(organizationId, failure);
+  await markZapierConnectionUsed(organizationId, prepared.serverFingerprint, failure);
   const updated = await transition(organizationId, execution.id, ["executing"], {
     state: finalState,
     detail: detail.slice(0, 1000),
@@ -616,7 +651,7 @@ export async function approveZapierAction(input: {
     detail: "Approved; executing.",
     approvedByUserId: input.userId,
     approvedAt: new Date(),
-    startedAt: new Date(),
+    startedAt: null,
   });
   if (!claimed) throw new ZapierExecutionError("Only a pending action can be approved.", "not_pending");
   await recordAudit({
@@ -627,7 +662,7 @@ export async function approveZapierAction(input: {
     entityId: existing.id,
     metadata: { capability: existing.capability },
   });
-  return (await execute(claimed, prepared, input.userId)).execution;
+  return (await execute(claimed, prepared, rebuilt, input.userId)).execution;
 }
 
 export async function rejectZapierAction(input: {

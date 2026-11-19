@@ -16,10 +16,10 @@ import { organizationsTable } from "./organizations";
 /**
  * Zapier Connected Apps give each GrowthOS specialist (SCOUT, APPT, INVO,
  * CALLIE, SCHED, ...) bounded, contractor-authorized hands in the apps the
- * contractor already uses. The contractor connects their own Zapier account
- * through the Zapier MCP Embed; Zapier returns a per-organization MCP server
- * URL that GrowthOS stores application-encrypted. Task usage is billed to the
- * contractor's own Zapier account, never to a platform credential.
+ * contractor already uses. New company connections are provisioned and paid
+ * for by MogulForge, using a dedicated server-specific token encrypted with
+ * organization-bound context. Legacy encrypted Embed URL records remain
+ * distinguishable for compatibility; they do not prove central ownership.
  *
  * No table in this file stores provider credentials or raw provider
  * responses in ordinary JSON fields; digests and bounded summaries only.

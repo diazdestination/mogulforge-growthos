@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { CheckCircle2, Loader2, RefreshCw, ShieldAlert, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -12,20 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ZapierFlowActions } from './zapier-flow-actions';
 
-/**
- * Zapier Connected Apps. The contractor connects their own Zapier account via
- * the Zapier MCP Embed; GrowthOS stores the resulting per-organization server
- * URL server-side. Every specialist capability is bound by the contractor to
- * one enabled action and governed by an off / approve / auto policy.
- */
-
 const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'scout.sms.review_request', 'appt.sms.on_my_way', 'bill.sms.payment_link', 'esti.sms.approval_link'];
 const CUSTOMER_EMAIL_KEYS = ['invo.email.send', 'esti.email.send'];
 const pollLabel = (minutes: number) => minutes % 60 === 0 ? `Every ${minutes / 60 === 1 ? 'hour' : `${minutes / 60} hours`}` : `Every ${minutes} minutes`;
 
 type ZapierStatus = {
   configured: boolean;
-  embedId: string | null;
+  provisioning: 'mogulforge' | 'legacy' | 'unassigned';
+  connectionFingerprint: string | null;
+  monthlyActionLimit?: number | null;
   connected: boolean;
   serverMode: 'agentic' | 'managed' | 'unknown' | null;
   toolCount: number | null;
@@ -93,10 +88,10 @@ type Execution = {
   completedAt: string | null;
 };
 
-const EMBED_SCRIPT = 'https://mcp.zapier.com/embed/v1/mcp.js';
 const EMPTY_STATUS: ZapierStatus = {
   configured: false,
-  embedId: null,
+  provisioning: 'unassigned',
+  connectionFingerprint: null,
   connected: false,
   serverMode: null,
   toolCount: null,
@@ -106,25 +101,10 @@ const EMPTY_STATUS: ZapierStatus = {
   lastErrorCode: null,
 };
 
-declare module 'react' {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      'zapier-mcp': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
-        'embed-id'?: string;
-        width?: string;
-        height?: string;
-        'sign-up-email'?: string;
-        'sign-up-first-name'?: string;
-        'sign-up-last-name'?: string;
-      };
-    }
-  }
-}
-
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     credentials: 'include',
+    cache: 'no-store',
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
     ...init,
   });
@@ -144,11 +124,10 @@ const STATE_LABEL: Record<string, string> = {
 };
 
 type ZapierConnectedAppsCardProps = {
-  signUp: { email: string | null; firstName: string | null; lastName: string | null };
   canManage: boolean;
 };
 
-export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAppsCardProps) {
+export function ZapierConnectedAppsCard({ canManage }: ZapierConnectedAppsCardProps) {
   const { toast } = useToast();
   const [status, setStatus] = useState<ZapierStatus | null>(null);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -156,22 +135,27 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
   const [actions, setActions] = useState<LiveAction[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [showEmbed, setShowEmbed] = useState(false);
-  const [scriptAttempt, setScriptAttempt] = useState(0);
-  const [scriptError, setScriptError] = useState(false);
   const [actionsLoading, setActionsLoading] = useState(false);
   const [actionsError, setActionsError] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const embedRef = useRef<HTMLElement | null>(null);
   const loadGeneration = useRef(0);
   const actionGeneration = useRef(0);
   const connectedRef = useRef(false);
+  const versionRef = useRef<string | null>(null);
   const mutationRef = useRef(false);
-  const embedGeneration = useRef(0);
+  const active = useRef(false);
 
-  useEffect(() => () => { ++loadGeneration.current; ++actionGeneration.current; }, []);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      ++loadGeneration.current;
+      ++actionGeneration.current;
+    };
+  }, []);
 
   const load = useCallback(async () => {
+    if (!active.current) return;
     const generation = ++loadGeneration.current;
     setLoading(true);
     try {
@@ -185,7 +169,14 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
       // never crash the Settings page.
       setStatus(nextStatus && typeof nextStatus.configured === 'boolean' ? nextStatus : { ...EMPTY_STATUS });
       connectedRef.current = Boolean(nextStatus?.connected);
-      if (!nextStatus?.connected) { ++actionGeneration.current; setActions(null); setActionsLoading(false); }
+      const version = nextStatus?.connectionFingerprint ?? null;
+      if (!nextStatus?.connected || version !== versionRef.current) {
+        ++actionGeneration.current;
+        setActions(null);
+        setActionsLoading(false);
+        setActionsError(false);
+      }
+      versionRef.current = version;
       setCapabilities(Array.isArray(nextCapabilities?.capabilities) ? nextCapabilities.capabilities : []);
       setExecutions(Array.isArray(nextExecutions?.executions) ? nextExecutions.executions : []);
       setLoadError(false);
@@ -223,95 +214,7 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
 
   useEffect(() => {
     if (status?.connected && canManage) void loadActions();
-  }, [status?.connected, canManage, loadActions]);
-
-  // Load the Zapier embed only when the contractor opens it; register the
-  // per-organization server URL the moment the embed reports it.
-  useEffect(() => {
-    if (!showEmbed || !status?.embedId) return;
-    let cancelled = false;
-    const generation = ++embedGeneration.current;
-    const controller = new AbortController();
-    let registering = false;
-    let toolsChangedDuringRegistration = false;
-    const ensureScript = () =>
-      new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector<HTMLScriptElement>(`script[src="${EMBED_SCRIPT}"]`);
-        if (existing?.dataset.loaded === 'true' || customElements.get('zapier-mcp')) {
-          resolve();
-          return;
-        }
-        const script = existing ?? document.createElement('script');
-        script.src = EMBED_SCRIPT;
-        script.async = true;
-        script.addEventListener('load', () => { script.dataset.loaded = 'true'; resolve(); }, { once: true });
-        script.addEventListener('error', () => { script.remove(); reject(new Error('Could not load the Zapier embed')); }, { once: true });
-        if (!existing) document.head.appendChild(script);
-      });
-    const onServerUrl = async (event: Event) => {
-      const serverUrl = (event as CustomEvent<{ serverUrl?: string }>).detail?.serverUrl;
-      if (!serverUrl || cancelled || registering || mutationRef.current || !canManage) return;
-      registering = true;
-      mutationRef.current = true;
-      setBusy('connect');
-      try {
-        const next = await api<ZapierStatus>('/integrations/zapier/server-url', {
-          method: 'POST',
-          body: JSON.stringify({ serverUrl }),
-          signal: controller.signal,
-        });
-        if (cancelled) return;
-        const alreadyConnected = connectedRef.current;
-        connectedRef.current = next.connected;
-        setStatus(next);
-        toast({ title: 'Zapier connected' });
-        await load();
-        if (!cancelled && alreadyConnected) await loadActions();
-      } catch (error) {
-        if (cancelled) return;
-        toast({ title: error instanceof Error ? error.message : 'Could not register the Zapier server', variant: 'destructive' });
-      } finally {
-        registering = false;
-        if (generation === embedGeneration.current) {
-          mutationRef.current = false;
-          if (!cancelled) {
-            setBusy(null);
-            if (toolsChangedDuringRegistration) {
-              toolsChangedDuringRegistration = false;
-              void loadActions();
-            }
-          }
-        }
-      }
-    };
-    const onClose = () => { setShowEmbed(false); setBusy(null); };
-    // Before registration this is intentionally deferred: registration always
-    // discovers fresh actions, including changes made while it was in flight.
-    const onToolsChanged = () => {
-      if (registering) { toolsChangedDuringRegistration = true; return; }
-      if (!cancelled && connectedRef.current) {
-        void loadActions().then(() => { if (!cancelled && !registering) void load(); });
-      }
-    };
-    setScriptError(false);
-    void ensureScript().catch(() => { if (!cancelled) setScriptError(true); });
-    const node = embedRef.current;
-    node?.addEventListener('mcp-server-url', onServerUrl);
-    node?.addEventListener('close-requested', onClose);
-    node?.addEventListener('tools-changed', onToolsChanged);
-    return () => {
-      cancelled = true;
-      controller.abort();
-      if (registering && generation === embedGeneration.current) {
-        ++embedGeneration.current;
-        mutationRef.current = false;
-        setBusy(null);
-      }
-      node?.removeEventListener('mcp-server-url', onServerUrl);
-      node?.removeEventListener('close-requested', onClose);
-      node?.removeEventListener('tools-changed', onToolsChanged);
-    };
-  }, [showEmbed, status?.embedId, load, loadActions, toast, canManage, scriptAttempt]);
+  }, [status?.connected, status?.connectionFingerprint, canManage, loadActions]);
 
   const disconnect = async () => {
     if (mutationRef.current || !canManage) return;
@@ -321,14 +224,15 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
     ++actionGeneration.current;
     ++loadGeneration.current;
     setActionsLoading(false);
-    setShowEmbed(false);
     setBusy('disconnect');
     try {
       await api('/integrations/zapier', { method: 'DELETE' });
+      if (!active.current) return;
       toast({ title: 'Zapier disconnected' });
       setActions(null);
       await load();
     } catch (error) {
+      if (!active.current) return;
       toast({ title: error instanceof Error ? error.message : 'Could not disconnect Zapier', variant: 'destructive' });
       await load();
     } finally {
@@ -348,6 +252,7 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
       });
       await load();
     } catch (error) {
+      if (!active.current) return;
       toast({ title: error instanceof Error ? error.message : 'Could not update the policy', variant: 'destructive' });
     } finally {
       mutationRef.current = false;
@@ -361,9 +266,11 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
     setBusy('textback');
     try {
       await api('/integrations/zapier/callie/text-back-settings', { method: 'PUT', body: JSON.stringify(body) });
+      if (!active.current) return;
       toast({ title: body.messagingRegistered ? 'Text-back settings saved' : 'Registration unconfirmed · missed-call text-back is Off' });
       await load();
     } catch (error) {
+      if (!active.current) return;
       toast({ title: error instanceof Error ? error.message : 'Could not save text-back settings', variant: 'destructive' });
     } finally {
       mutationRef.current = false;
@@ -379,6 +286,7 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
       await api('/integrations/zapier/poll-interval', { method: 'PUT', body: JSON.stringify({ minutes }) });
       await load();
     } catch (error) {
+      if (!active.current) return;
       toast({ title: error instanceof Error ? error.message : 'Could not update the sync interval', variant: 'destructive' });
     } finally {
       mutationRef.current = false;
@@ -394,6 +302,7 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
       await api(`/integrations/zapier/capabilities/${capability.key}/binding`, { method: 'DELETE' });
       await load();
     } catch (error) {
+      if (!active.current) return;
       toast({ title: error instanceof Error ? error.message : 'Could not remove the binding', variant: 'destructive' });
     } finally {
       mutationRef.current = false;
@@ -407,9 +316,11 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
     setBusy(`decide:${execution.id}`);
     try {
       await api(`/integrations/zapier/executions/${execution.id}/${decision}`, { method: 'POST', body: JSON.stringify({}) });
+      if (!active.current) return;
       toast({ title: decision === 'approve' ? 'Action approved' : 'Action rejected' });
       await load();
     } catch (error) {
+      if (!active.current) return;
       toast({ title: error instanceof Error ? error.message : 'Could not update the action', variant: 'destructive' });
     } finally {
       mutationRef.current = false;
@@ -424,56 +335,37 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
       <CardHeader>
         <CardTitle>Zapier Connected Apps</CardTitle>
         <CardDescription>
-          Connect your apps to the supported specialist flows below. Use your own Zapier account and choose which flows may run.
+          MogulForge sets up your app connection. Your team chooses which flows may run.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {loadError && <Alert variant="destructive"><AlertTitle>Could not refresh Zapier setup</AlertTitle><AlertDescription>Try refreshing again. Previously loaded settings may be out of date.<Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>Retry setup</Button></AlertDescription></Alert>}
         {loading && !status ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Checking Zapier…</div>
-        ) : !status ? null : !status.configured ? (
-          <Alert>
-            <ShieldAlert className="h-4 w-4" />
-            <AlertTitle>Not available on this deployment</AlertTitle>
-            <AlertDescription>
-              The operator has not configured the Zapier MCP embed for GrowthOS yet. Ask your MogulForge contact to enable it.
-            </AlertDescription>
-          </Alert>
-        ) : (
+        ) : !status ? null : (
           <>
-            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-              <li>Connect your own Zapier account.</li>
-              <li>Add the app and enable its listed action in Zapier.</li>
-              <li>Select a supported flow below and fill in its required settings.</li>
-              <li>Save the flow, then choose its policy and daily limit.</li>
-            </ol>
-            <p className="text-sm text-muted-foreground">Connection alone does not enable a flow. Saving a binding switches that flow Off; choose its policy yourself. Discovering actions does not test whether they will run.</p>
-            {!canManage && <p className="text-sm text-muted-foreground">Ask an owner or administrator with settings access to connect apps, configure flows and choose policies. You can review the current setup here.</p>}
             <div className="flex flex-wrap items-center gap-3">
-              <Badge variant={status.connected ? 'default' : 'secondary'}>{status.connected ? 'Connected' : 'Not connected'}</Badge>
-              {status.connected && status.toolCount !== null && (
-                <span className="text-sm text-muted-foreground">{status.toolCount} Zapier tools available · {status.serverMode} mode</span>
-              )}
-              {status.lastErrorCode && (
-                <span className="text-sm text-destructive">Last error: {status.lastErrorCode}</span>
-              )}
+              <Badge variant={status.connected ? 'default' : 'secondary'}>
+                {status.provisioning === 'legacy' ? 'Connection needs review' :
+                  status.connected && status.provisioning === 'mogulforge' ? 'Managed by MogulForge' :
+                  status.connectionFingerprint ? 'Disconnected' : 'Awaiting MogulForge setup'}
+              </Badge>
               <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
                 <Button variant="outline" size="sm" onClick={() => void load()} disabled={busy !== null || loading}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
-                {canManage && !status.connected && (
-                  <Button size="sm" onClick={() => setShowEmbed((value) => !value)} disabled={busy !== null}>
-                    {showEmbed ? 'Hide Zapier' : 'Connect Zapier'}
-                  </Button>
-                )}
                 {canManage && status.connected && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => setShowEmbed((value) => !value)} disabled={busy !== null}>
-                      {showEmbed ? 'Hide Zapier' : 'Manage apps in Zapier'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => void disconnect()} disabled={busy !== null}>Disconnect</Button>
-                  </>
+                  <Button variant="outline" size="sm" onClick={() => void disconnect()} disabled={busy !== null}>Disconnect</Button>
                 )}
               </div>
             </div>
+            {status.provisioning === 'legacy' && (
+              <p className="text-sm text-muted-foreground">Ask MogulForge to review this existing connection.</p>
+            )}
+            {status.connected && status.monthlyActionLimit === 0 && (
+              <p className="text-sm text-muted-foreground">MogulForge has paused connected app actions for your company. Contact MogulForge to review your setup.</p>
+            )}
+            {!status.connected && <p className="text-sm text-muted-foreground">Contact MogulForge to connect your apps.</p>}
+            {status.connected && <p className="text-sm text-muted-foreground">Choose a supported flow and fill in its required settings. Saving the flow sets its policy to Off until you choose when it may run.</p>}
+            {!canManage && <p className="text-sm text-muted-foreground">An owner or administrator can configure flows and choose policies. You can review the current setup here.</p>}
 
             {status.connected && status.pollIntervalMinutes && status.pollIntervalChoices?.length ? (
               <div className="space-y-1">
@@ -487,24 +379,9 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
                 >
                   {status.pollIntervalChoices.map((minutes) => <option key={minutes} value={minutes}>{pollLabel(minutes)}</option>)}
                 </select>
-                <p className="text-xs text-muted-foreground">How often automatic reads (leads, reviews, calls, customer email replies) may each use a Zapier task. Shorter intervals use more of your Zapier plan.</p>
+                <p className="text-xs text-muted-foreground">How often GrowthOS checks connected apps for leads, reviews, calls and customer email replies.</p>
               </div>
             ) : null}
-
-            {showEmbed && status.embedId && (
-              <div className="min-w-0 overflow-hidden rounded-md border">
-                {scriptError && <Alert variant="destructive"><AlertTitle>Zapier could not load</AlertTitle><AlertDescription>Check your connection and try again.<Button variant="outline" size="sm" onClick={() => setScriptAttempt(value => value + 1)}>Retry loading Zapier</Button></AlertDescription></Alert>}
-                <zapier-mcp
-                  ref={embedRef as React.RefObject<HTMLElement>}
-                  embed-id={status.embedId}
-                  width="100%"
-                  height="640px"
-                  sign-up-email={signUp.email ?? undefined}
-                  sign-up-first-name={signUp.email ? signUp.firstName ?? 'GrowthOS' : undefined}
-                  sign-up-last-name={signUp.email ? signUp.lastName ?? 'User' : undefined}
-                />
-              </div>
-            )}
 
             {pending.length > 0 && (
               <div className="space-y-2">
@@ -539,11 +416,11 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
                 )}
               </div>
               {actionsLoading && <p role="status" className="text-sm text-muted-foreground">Checking your enabled actions…</p>}
-              {actionsError && <Alert variant="destructive"><AlertTitle>Could not discover enabled actions</AlertTitle><AlertDescription>Check the app connection in Zapier, then reload enabled actions. Existing bindings have not been changed.</AlertDescription></Alert>}
+              {actionsError && <Alert variant="destructive"><AlertTitle>Could not load available actions</AlertTitle><AlertDescription>Try reloading. Contact MogulForge if the connection is still unavailable.</AlertDescription></Alert>}
               {status.serverMode === 'managed' && <p className="text-sm text-muted-foreground">This fixed-tool connection cannot configure these specialist flows. Reconnect using Zapier’s app/action discovery setup so it exposes the supported apps and actions below. Contact your operator if your account only offers fixed tools.</p>}
               {capabilities.map((capability) => (
                 <CapabilityRow
-                  key={capability.key}
+                  key={JSON.stringify([capability.key, status.connectionFingerprint])}
                   capability={capability}
                   actions={actionsError || actionsLoading ? null : actions}
                   canManage={canManage && status.connected}
@@ -716,7 +593,7 @@ function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind
         <div className="space-y-2 rounded-md bg-muted/40 p-3">
           {matches.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              None of your enabled Zapier actions match this flow yet. Open Manage apps in Zapier, connect one of the supported apps above and enable its listed action with {capability.direction} access. This page refreshes when Zapier reports a change; use Reload enabled actions if needed.
+              Contact MogulForge to make a supported app available for this flow. Reload enabled actions after setup.
             </p>
           ) : (
             <div className="flex flex-wrap items-end gap-3">

@@ -5,4 +5,6 @@
 *.log
 pnpm-workspace.yaml.bak
 **/.env
+**/.local
+**/.superpowers
 /work

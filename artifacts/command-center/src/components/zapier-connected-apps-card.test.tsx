@@ -15,24 +15,19 @@ vi.mock('@/components/ui/select', () => ({
 }));
 import { ZapierConnectedAppsCard } from './zapier-connected-apps-card';
 
-const status = { configured: true, embedId: 'fixture-embed', connected: true, serverMode: 'agentic', toolCount: 1, connectedAt: null, lastUsedAt: null, lastErrorAt: null, lastErrorCode: null };
+const status = { configured: true, provisioning: 'mogulforge', connectionFingerprint: 'opaque-v1', connected: true, serverMode: 'agentic', toolCount: 1, connectedAt: null, lastUsedAt: null, lastErrorAt: null, lastErrorCode: null };
 const capability = { key: 'appt.calendar.create_event', specialistId: 'appt', direction: 'write', label: 'Book calendar events', description: 'Send a scheduled visit to your calendar.', candidates: [{ app: 'googlecalendar', appName: 'Google Calendar', action: 'create_event', actionName: 'Create Event', configFields: [{ key: 'calendarid', label: 'Calendar', required: true }] }], binding: null, policy: { mode: 'off', dailyBudget: 20, updatedAt: null } };
 const action = { app: 'googlecalendar', appName: 'Google Calendar', action: 'create_event', actionName: 'Create Event', actionType: 'write', description: null };
-const signUp = { email: null, firstName: null, lastName: null };
 let connected = true;
 let liveActions: any[] = [action];
 let actionsResponse: (() => Promise<Response>) | undefined;
-let registerResponse: (() => Promise<Response>) | undefined;
 const response = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 502, json: async () => body }) as Response;
 const calls = (suffix: string) => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith(suffix));
-const embed = () => document.querySelector('zapier-mcp')!;
-const event = async (name: string, detail?: unknown) => { await act(async () => { embed().dispatchEvent(new CustomEvent(name, { detail })); }); };
 const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; };
 
 beforeEach(() => {
-  connected = true; liveActions = [action]; actionsResponse = undefined; registerResponse = undefined;
+  connected = true; liveActions = [action]; actionsResponse = undefined;
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    if (url.endsWith('/server-url')) return registerResponse ? registerResponse() : response({ ...status, connected: connected = true });
     if (url.endsWith('/actions')) return actionsResponse ? actionsResponse() : response({ actions: liveActions });
     if (url.endsWith('/capabilities')) return response({ capabilities: [capability] });
     if (url.includes('/executions?')) return response({ executions: [] });
@@ -44,60 +39,13 @@ afterEach(() => { cleanup(); document.querySelectorAll('script[src*="mcp.zapier.
 
 describe('client Zapier setup', () => {
   it('discovers enabled actions automatically without granting any action authority', async () => {
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    render(<ZapierConnectedAppsCard canManage />);
     await waitFor(() => expect(calls('/actions')).toHaveLength(1));
     expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method)).toBe(true);
-    expect(screen.getByText(/Connect your own Zapier account/)).toBeTruthy();
-    expect(screen.getByText(/Connection alone does not enable/)).toBeTruthy();
-  });
-
-  it('refreshes on tools-changed and preserves the same embed during refresh', async () => {
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Manage apps in Zapier' }));
-    const original = embed();
-    await event('tools-changed');
-    await waitFor(() => expect(calls('/actions').length).toBeGreaterThanOrEqual(2));
-    expect(embed()).toBe(original);
-  });
-
-  it('keeps setup open after registration and discovers tools changed before registration', async () => {
-    connected = false;
-    const pending = deferred<Response>(); registerResponse = () => pending.promise;
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Connect Zapier' }));
-    const original = embed();
-    await event('mcp-server-url', { serverUrl: 'https://mcp.zapier.com/api/mcp/fixture' });
-    await event('tools-changed');
-    connected = true;
-    await act(async () => pending.resolve(response(status)));
-    await waitFor(() => expect(calls('/actions').length).toBeGreaterThan(0));
-    expect(embed()).toBe(original);
-  });
-
-  it('offers an actual script retry after a failed load', async () => {
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Manage apps in Zapier' }));
-    const failed = document.querySelector('script[src*="mcp.zapier.com"]')!;
-    fireEvent.error(failed);
-    fireEvent.click(await screen.findByRole('button', { name: 'Retry loading Zapier' }));
-    await waitFor(() => expect(document.querySelector('script[src*="mcp.zapier.com"]')).not.toBe(failed));
-  });
-
-  it('refreshes again for a tools change received after discovery starts during registration', async () => {
-    connected = false;
-    liveActions = [];
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Connect Zapier' }));
-    const pendingStatus = deferred<Response>();
-    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
-    vi.mocked(fetch).mockImplementation((url, init) => String(url).endsWith('/integrations/zapier') && !init?.method ? pendingStatus.promise : originalFetch(url, init));
-    await event('mcp-server-url', { serverUrl: 'https://mcp.zapier.com/api/mcp/fixture' });
-    await waitFor(() => expect(calls('/actions')).toHaveLength(1));
-    liveActions = [action];
-    await event('tools-changed');
-    await act(async () => pendingStatus.resolve(response(status)));
-    await waitFor(() => expect(calls('/actions')).toHaveLength(2));
-    await screen.findByRole('button', { name: 'Save flow' });
+    expect(screen.getByText('Managed by MogulForge')).toBeTruthy();
+    expect(screen.getByText(/Saving the flow sets its policy to Off/)).toBeTruthy();
+    expect(document.querySelector('zapier-mcp, script[src*="mcp.zapier.com"], [sign-up-email]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Connect Zapier|Manage apps in Zapier|Enable action|Search actions/ })).toBeNull();
   });
 
   it('recommends Automatic only for the tap-sent field texts, without switching them on', async () => {
@@ -105,7 +53,7 @@ describe('client Zapier setup', () => {
     const reminder = { ...capability, key: 'appt.sms.send', label: 'Text appointment reminders', recommendedMode: 'approve', candidates: onMyWay.candidates };
     const base = vi.mocked(fetch).getMockImplementation()!;
     vi.mocked(fetch).mockImplementation(async (url: any, init?: RequestInit) => String(url).endsWith('/capabilities') ? response({ capabilities: [onMyWay, reminder] }) : base(url, init));
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    render(<ZapierConnectedAppsCard canManage />);
     expect(await screen.findAllByText(/Recommended: Automatic/)).toHaveLength(1);
     expect(screen.getAllByText(/Configured · Off|Select and configure a supported action/).length).toBeGreaterThan(0);
   });
@@ -122,7 +70,7 @@ describe('client Zapier setup', () => {
       if (path.endsWith('/callie/text-back-settings')) { registered = JSON.parse(String(init!.body)).messagingRegistered; return response({ textBack: textBack() }); }
       return base(url, init);
     });
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    render(<ZapierConnectedAppsCard canManage />);
     const box = await screen.findByRole('checkbox', { name: /business texting is registered \(required\)/i });
     expect(box.getAttribute('aria-checked')).toBe('false');
     expect(screen.getByText(/A2P 10DLC brand and campaign \(Twilio\) or completed Quo business-texting registration/)).toBeTruthy();
@@ -148,7 +96,7 @@ describe('client Zapier setup', () => {
     const callie = { ...capability, key: 'callie.sms.send', specialistId: 'callie', label: 'Text back missed callers', textBack: { messagingRegistered: false, registeredByName: null, registeredAt: null, windowHours: 24, windowChoices: [12, 24, 48, 72] } };
     const base = vi.mocked(fetch).getMockImplementation()!;
     vi.mocked(fetch).mockImplementation(async (url: any, init?: RequestInit) => String(url).endsWith('/capabilities') ? response({ capabilities: [callie] }) : base(url, init));
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage={false} />);
+    render(<ZapierConnectedAppsCard canManage={false} />);
     const box = await screen.findByRole('checkbox', { name: /business texting is registered/i });
     expect((box as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByLabelText('Text-back window') as HTMLSelectElement).disabled).toBe(true);
@@ -158,14 +106,15 @@ describe('client Zapier setup', () => {
 
   it('shows supported app/action and missing setup guidance even before connection', async () => {
     connected = false;
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    await screen.findByRole('button', { name: 'Connect Zapier' });
+    vi.mocked(fetch).mockImplementationOnce(async () => response({ ...status, connected: false, configured: false, provisioning: 'unassigned', connectionFingerprint: null }));
+    render(<ZapierConnectedAppsCard canManage />);
+    await screen.findByText('Awaiting MogulForge setup');
     expect(screen.getByText(/Google Calendar → Create Event/)).toBeTruthy();
-    expect(screen.getByText(/Add the app and enable its listed action/)).toBeTruthy();
+    expect(screen.getByText(/Contact MogulForge to connect your apps/)).toBeTruthy();
   });
 
   it('blocks saving missing or whitespace-only required configuration and links its label', async () => {
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    render(<ZapierConnectedAppsCard canManage />);
     // Clicking Reload keeps this regression independent of automatic discovery.
     fireEvent.click(await screen.findByRole('button', { name: /(?:Load|Reload) enabled actions/ }));
     await screen.findByRole('button', { name: 'Save flow' });
@@ -186,77 +135,62 @@ describe('client Zapier setup', () => {
 
   it('does not offer an action with the wrong read/write direction', async () => {
     liveActions = [{ ...action, actionType: 'read' }];
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    render(<ZapierConnectedAppsCard canManage />);
     fireEvent.click(await screen.findByRole('button', { name: /(?:Load|Reload) enabled actions/ }));
-    await screen.findByText(/None of your enabled Zapier actions match/);
+    await screen.findByText(/Contact MogulForge to make a supported app available/);
     expect(screen.queryByRole('button', { name: 'Save flow' })).toBeNull();
   });
 
   it('explains manager access and never requests manager-only actions for a read-only member', async () => {
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage={false} />);
-    expect(await screen.findByText(/Ask an owner or administrator/)).toBeTruthy();
+    render(<ZapierConnectedAppsCard canManage={false} />);
+    expect(await screen.findByText(/An owner or administrator/)).toBeTruthy();
     expect(calls('/actions')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'Manage apps in Zapier' })).toBeNull();
   });
 
   it('offers action discovery recovery without misreporting an unavailable provider as no matching apps', async () => {
     actionsResponse = async () => response({ error: 'Zapier authorization expired' }, false);
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    await screen.findByText('Could not discover enabled actions');
-    expect(screen.queryByText(/None of your enabled Zapier actions match/)).toBeNull();
+    render(<ZapierConnectedAppsCard canManage />);
+    await screen.findByText('Could not load available actions');
+    expect(screen.queryByText(/Contact MogulForge to make a supported app available/)).toBeNull();
     actionsResponse = undefined;
     fireEvent.click(screen.getByRole('button', { name: /(?:Load|Reload) enabled actions/ }));
     await screen.findByRole('button', { name: 'Save flow' });
-    expect(screen.queryByText('Could not discover enabled actions')).toBeNull();
-  });
-
-  it('keeps the same usable embed while status refresh is pending', async () => {
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Manage apps in Zapier' }));
-    const original = embed();
-    const pending = deferred<Response>();
-    vi.mocked(fetch).mockImplementationOnce(() => pending.promise);
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
-    expect(embed()).toBe(original);
-    await act(async () => pending.resolve(response(status)));
-    expect(embed()).toBe(original);
-  });
-
-  it('ignores a late registration failure after close without an error toast', async () => {
-    connected = false;
-    const pending = deferred<Response>(); registerResponse = () => pending.promise;
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Connect Zapier' }));
-    await event('mcp-server-url', { serverUrl: 'https://mcp.zapier.com/api/mcp/fixture' });
-    await event('close-requested');
-    await act(async () => pending.resolve(response({ error: 'Late registration failure' }, false)));
-    expect(toast).not.toHaveBeenCalled();
-    expect((screen.getByRole('button', { name: 'Connect Zapier' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText('Could not load available actions')).toBeNull();
   });
 
   it('ignores an action discovery result after disconnect', async () => {
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    render(<ZapierConnectedAppsCard canManage />);
     await screen.findByRole('button', { name: /(?:Load|Reload) enabled actions/ });
     const pending = deferred<Response>(); actionsResponse = () => pending.promise;
     fireEvent.click(screen.getByRole('button', { name: /(?:Load|Reload) enabled actions/ }));
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
-    await screen.findByRole('button', { name: 'Connect Zapier' });
+    expect(calls('/integrations/zapier').filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0);
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    await screen.findByText('Disconnected');
     await act(async () => pending.resolve(response({ actions: [action] })));
     expect(screen.queryByRole('button', { name: 'Save flow' })).toBeNull();
   });
 
-  it('ignores a late registration response after the embed requests close', async () => {
-    connected = false;
-    const pending = deferred<Response>(); registerResponse = () => pending.promise;
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Connect Zapier' }));
-    await event('mcp-server-url', { serverUrl: 'https://mcp.zapier.com/api/mcp/fixture' });
-    await event('close-requested');
-    await act(async () => pending.resolve(response(status)));
-    expect(embed()).toBeNull();
-    expect(screen.queryByText('Zapier connected')).toBeNull();
-    expect(calls('/actions')).toHaveLength(0);
+  it('labels a legacy connection for review and preserves business approval', async () => {
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    const pending = { id: 'action-1', specialistId: 'appt', capability: 'Calendar booking', state: 'pending_approval', requestSummary: { customer: 'Fixture' }, createdAt: new Date().toISOString() };
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/integrations/zapier')) return response({ ...status, provisioning: 'legacy', configured: false, serverMode: 'managed' });
+      if (String(url).includes('/executions?')) return response({ executions: [pending] });
+      return base(url, init);
+    });
+    const view = render(<ZapierConnectedAppsCard key="reader" canManage={false} />);
+    await screen.findByText('Connection needs review');
+    expect(screen.queryByText('Managed by MogulForge')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Approve' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Disconnect' })).toBeNull();
+    view.rerender(<ZapierConnectedAppsCard key="owner" canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(calls('/executions/action-1/approve')).toHaveLength(1));
+    expect(calls('/executions/action-1/approve')[0]?.[1]?.method).toBe('POST');
   });
 
   it('sets crew phones by eligible member name and validates the phone without exposing raw ids', async () => {
@@ -268,7 +202,7 @@ describe('client Zapier setup', () => {
       if (String(url).endsWith('/users')) return response([{ id: 'private-crew-id', firstName: 'Fictional', lastName: 'Crew', email: 'crew@example.test', isActive: true, operationallyEligible: true }, { id: 'ineligible-id', firstName: 'Unavailable', isActive: false, operationallyEligible: true }]);
       return originalFetch(url, init);
     });
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    render(<ZapierConnectedAppsCard canManage />);
     await screen.findByRole('button', { name: 'Save flow' });
     fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: 'twilio::send_sms' } });
     const member = await screen.findByLabelText('Crew member');
@@ -293,7 +227,7 @@ describe('client Zapier setup', () => {
       if (path.includes('/executions?')) return response({ executions: [] });
       return response(polled);
     });
-    const view = render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    const view = render(<ZapierConnectedAppsCard canManage />);
     const select = await screen.findByLabelText('Automatic sync interval') as HTMLSelectElement;
     expect(select.value).toBe('240');
     expect(Array.from(select.options).map(option => option.textContent)).toEqual(['Every hour', 'Every 4 hours', 'Every 24 hours']);
@@ -301,7 +235,7 @@ describe('client Zapier setup', () => {
     await waitFor(() => expect(calls('/poll-interval')).toHaveLength(1));
     expect(calls('/poll-interval')[0]![1]).toMatchObject({ method: 'PUT', body: JSON.stringify({ minutes: 60 }) });
     view.unmount();
-    render(<ZapierConnectedAppsCard signUp={signUp} canManage={false} />);
+    render(<ZapierConnectedAppsCard canManage={false} />);
     expect(((await screen.findByLabelText('Automatic sync interval')) as HTMLSelectElement).disabled).toBe(true);
   });
 });

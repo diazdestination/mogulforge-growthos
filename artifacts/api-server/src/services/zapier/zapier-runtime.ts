@@ -4,7 +4,7 @@ import {
   zapierMcpConnectionsTable,
   zapierSpecialistPoliciesTable,
 } from "@workspace/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, like } from "drizzle-orm";
 
 import { zapierMcpConfigured } from "./zapier-mcp-client";
 import { callieSyncCalls, scoutSyncMarketplaceLeads, scoutSyncReviews } from "./zapier-specialist-flows";
@@ -36,14 +36,15 @@ const READ_SYNCS = {
 } as const;
 
 export async function processZapierConnectedApps(organizationId?: string): Promise<void> {
-  if (!zapierMcpConfigured()) return;
   const connections = await db
     .select({ organizationId: zapierMcpConnectionsTable.organizationId })
     .from(zapierMcpConnectionsTable)
     .where(
-      organizationId
-        ? and(eq(zapierMcpConnectionsTable.organizationId, organizationId), isNull(zapierMcpConnectionsTable.revokedAt))
-        : isNull(zapierMcpConnectionsTable.revokedAt),
+      and(
+        isNull(zapierMcpConnectionsTable.revokedAt),
+        organizationId ? eq(zapierMcpConnectionsTable.organizationId, organizationId) : undefined,
+        zapierMcpConfigured() ? undefined : like(zapierMcpConnectionsTable.serverUrlFingerprint, "mf1:%"),
+      ),
     );
   for (const connection of connections) {
     const bindings = await db

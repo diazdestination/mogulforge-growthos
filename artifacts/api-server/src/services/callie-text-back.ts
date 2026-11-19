@@ -1,3 +1,4 @@
+import { withZapierOrgTransaction } from "./zapier/zapier-credential-metadata";
 /**
  * CALLIE missed-call text-back: the eligibility side.
  *
@@ -191,7 +192,7 @@ export async function saveCallieTextBackSettings(input: {
 }): Promise<CallieTextBackSettings> {
   const { getOrgSettings } = await import("./settings");
   await getOrgSettings(input.organizationId); // ensure the row exists
-  return db.transaction(async (tx) => {
+  return withZapierOrgTransaction(input.organizationId, async (tx) => {
     const current = await getCallieTextBackSettings(input.organizationId, tx);
     const windowHours = input.windowHours ?? current.windowHours;
     if (!Number.isInteger(windowHours) || windowHours < 1 || windowHours > 168) {

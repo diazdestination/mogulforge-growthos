@@ -121,6 +121,34 @@ it("blocks organization owners who are not platform administrators", async () =>
     calls.mock.calls.some(([url]) => String(url).includes("/platform/")),
   ).toBe(false);
 });
+it("requires explicit target selection and scopes managed Zapier to the company in view", async () => {
+  const calls = setup(true, (_method, path) => {
+    if (!path.endsWith("/integrations/zapier")) return undefined;
+    const organizationId = path.includes("/o2/") ? "o2" : "o1";
+    return response({
+      organizationId,
+      status: { provisioning: "unassigned", connected: false, connectionFingerprint: null },
+      serverReference: null,
+      usage: { monthStartUtc: "2026-11-01T00:00:00.000Z", successfulActions: 0, indeterminateActions: 0, estimatedTasksFromRecordedActions: 0 },
+    });
+  });
+  const zapierPaths = () => calls.mock.calls.map(([url]) => String(url)).filter((url) => url.endsWith("/integrations/zapier"));
+  renderWithQuery(<ClientLaunchpad />);
+  const open = await screen.findByRole("button", { name: "Set up Zapier for Painless local QA" });
+  expect(zapierPaths()).toEqual([]);
+  fireEvent.click(open);
+  await screen.findByText("No connection assigned");
+  expect(zapierPaths()).toEqual(["/api/v1/platform/clients/o1/integrations/zapier"]);
+  const oldToken = screen.getByLabelText("Private connection token") as HTMLInputElement;
+  fireEvent.change(oldToken, { target: { value: "fixture-token" } });
+  fireEvent.change(screen.getByLabelText("Review client setup"), { target: { value: "o2" } });
+  await screen.findByText("Retail local QA · o2");
+  await screen.findByText("No connection assigned");
+  expect(zapierPaths().at(-1)).toBe("/api/v1/platform/clients/o2/integrations/zapier");
+  expect(oldToken.value).toBe("");
+  expect((screen.getByLabelText("Private connection token") as HTMLInputElement).value).toBe("");
+});
+
 it("distinguishes configured, unverified and not-assessed without pretending a draft is live", async () => {
   setup();
   renderWithQuery(<ClientLaunchpad />);
