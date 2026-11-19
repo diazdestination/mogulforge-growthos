@@ -1,3 +1,4 @@
+import { withZapierOrgTransaction, managedMetadata, publicVersion } from "./zapier-credential-metadata";
 import {
   db,
   zapierCapabilityBindingsTable,
@@ -12,16 +13,13 @@ import {
 } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
 
-import { decryptSecret, encryptSecret } from "../../lib/token-encryption";
+import { decryptSecret } from "../../lib/token-encryption";
 import { recordAudit } from "../audit";
 import { CALLIE_TEXTBACK_CAPABILITY, describeCallieTextBackSettings, getCallieTextBackSettings, type CallieTextBackView } from "../callie-text-back";
 import {
   detectServerMode,
-  sha256Hex,
-  validateZapierServerUrl,
   withZapierMcpSession,
   zapierMcpConfig,
-  zapierMcpConfigured,
   ZapierMcpError,
   ZAPIER_META_TOOLS,
 } from "./zapier-mcp-client";
@@ -35,9 +33,8 @@ import {
 /**
  * Tenant-scoped Zapier connection, capability bindings, and policies.
  *
- * The per-organization MCP server URL is the credential. It is encrypted with
- * the organization bound as AAD, decrypted only inside this module, and never
- * returned to a client, written to audit metadata, or logged.
+ * Each managed envelope or legacy URL uses the organization as encryption AAD.
+ * Status and audit records contain only sanitized metadata.
  */
 
 function credentialContext(organizationId: string): string {
@@ -45,6 +42,9 @@ function credentialContext(organizationId: string): string {
 }
 
 export type ZapierConnectionStatus = {
+  monthlyActionLimit: number | null;
+  provisioning: "mogulforge" | "legacy" | "unassigned";
+  connectionFingerprint: string | null;
   configured: boolean;
   embedId: string | null;
   connected: boolean;
@@ -77,11 +77,20 @@ export async function getZapierConnection(organizationId: string, reader: Pick<t
 }
 
 export async function getZapierStatus(organizationId: string): Promise<ZapierConnectionStatus> {
+  const [row] = await db.select().from(zapierMcpConnectionsTable).where(eq(zapierMcpConnectionsTable.organizationId, organizationId));
+  return describeZapierStatus(row ?? null);
+}
+
+export function describeZapierStatus(row: ZapierMcpConnection | null): ZapierConnectionStatus {
   const config = zapierMcpConfig();
-  const connection = await getZapierConnection(organizationId);
+  const connection = row?.revokedAt ? null : row;
+  const provisioning = row ? managedMetadata(row.serverUrlFingerprint) ? "mogulforge" : "legacy" : "unassigned";
   return {
-    configured: config !== null,
-    embedId: config?.embedId ?? null,
+    monthlyActionLimit: row ? managedMetadata(row.serverUrlFingerprint)?.monthlyActionLimit ?? null : null,
+    provisioning,
+    connectionFingerprint: publicVersion(row),
+    configured: provisioning === "mogulforge" || config !== null,
+    embedId: null,
     connected: connection !== null,
     serverMode: connection?.serverMode ?? null,
     toolCount: connection?.toolCount ?? null,
@@ -141,7 +150,7 @@ export async function requireZapierServerUrl(organizationId: string): Promise<{
   return { connection, serverUrl };
 }
 
-export async function markZapierConnectionUsed(organizationId: string, error?: ZapierMcpError | null): Promise<void> {
+export async function markZapierConnectionUsed(organizationId: string, fingerprint: string, error?: ZapierMcpError | null): Promise<void> {
   await db
     .update(zapierMcpConnectionsTable)
     .set(
@@ -152,98 +161,15 @@ export async function markZapierConnectionUsed(organizationId: string, error?: Z
     .where(
       and(
         eq(zapierMcpConnectionsTable.organizationId, organizationId),
+        eq(zapierMcpConnectionsTable.serverUrlFingerprint, fingerprint),
         isNull(zapierMcpConnectionsTable.revokedAt),
       ),
     );
 }
 
-/**
- * Register the server URL the Zapier embed handed the signed-in member. The
- * URL is validated, probed once for its tool list, and stored encrypted.
- * Reconnecting replaces the previous URL in place. Saved app choices remain,
- * but a different server pauses policies until the owner reviews that account.
- */
-export async function registerZapierServerUrl(input: {
-  organizationId: string;
-  userId: string;
-  serverUrl: string;
-}): Promise<ZapierConnectionStatus> {
-  if (!zapierMcpConfigured()) {
-    throw new ZapierMcpError("Zapier Connected Apps is not configured on this GrowthOS deployment.", "not_configured");
-  }
-  const url = validateZapierServerUrl(input.serverUrl);
-  const normalized = url.toString();
-  const tools = await withZapierMcpSession(normalized, (session) => session.listTools());
-  const serverMode = detectServerMode(tools);
-  const encryptedServerUrl = encryptSecret(normalized, credentialContext(input.organizationId));
-  const fingerprint = sha256Hex(normalized);
-  const now = new Date();
-  await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select({ id: zapierMcpConnectionsTable.id, fingerprint: zapierMcpConnectionsTable.serverUrlFingerprint })
-      .from(zapierMcpConnectionsTable)
-      .where(eq(zapierMcpConnectionsTable.organizationId, input.organizationId));
-    const values = {
-      organizationId: input.organizationId,
-      connectedByUserId: input.userId,
-      encryptedServerUrl,
-      serverUrlFingerprint: fingerprint,
-      serverHost: url.hostname.toLowerCase(),
-      serverMode,
-      toolCount: tools.length,
-      lastToolsRefreshedAt: now,
-      connectedAt: now,
-      lastUsedAt: null,
-      lastErrorAt: null,
-      lastErrorCode: null,
-      revokedAt: null,
-    };
-    if (existing) {
-      if (existing.fingerprint !== fingerprint) {
-        await tx.update(zapierSpecialistPoliciesTable).set({ mode: "off", updatedByUserId: input.userId, updatedAt: now }).where(eq(zapierSpecialistPoliciesTable.organizationId, input.organizationId));
-      }
-      await tx.update(zapierMcpConnectionsTable).set(values).where(eq(zapierMcpConnectionsTable.id, existing.id));
-    } else {
-      await tx.insert(zapierMcpConnectionsTable).values(values);
-    }
-  });
-  await recordAudit({
-    organizationId: input.organizationId,
-    actorUserId: input.userId,
-    action: "integration.zapier_connected",
-    entityType: "zapier_mcp_connection",
-    metadata: { serverMode, toolCount: tools.length, fingerprint: fingerprint.slice(0, 16) },
-  });
-  return getZapierStatus(input.organizationId);
-}
-
 export async function disconnectZapier(organizationId: string, userId: string): Promise<boolean> {
-  const rows = await db
-    .update(zapierMcpConnectionsTable)
-    .set({
-      revokedAt: new Date(),
-      // Remove the credential immediately; a revoked row keeps only metadata.
-      encryptedServerUrl: "",
-    })
-    .where(
-      and(
-        eq(zapierMcpConnectionsTable.organizationId, organizationId),
-        isNull(zapierMcpConnectionsTable.revokedAt),
-      ),
-    )
-    .returning({ id: zapierMcpConnectionsTable.id });
-  if (rows.length === 0) return false;
-  await db
-    .update(zapierSpecialistPoliciesTable)
-    .set({ mode: "off", updatedByUserId: userId })
-    .where(eq(zapierSpecialistPoliciesTable.organizationId, organizationId));
-  await recordAudit({
-    organizationId,
-    actorUserId: userId,
-    action: "integration.zapier_disconnected",
-    entityType: "zapier_mcp_connection",
-  });
-  return true;
+  const { revokeZapier } = await import("./zapier-managed");
+  return revokeZapier(organizationId, userId);
 }
 
 // ---------- live action discovery (agentic servers) ----------
@@ -293,6 +219,7 @@ export async function listZapierEnabledActions(organizationId: string): Promise<
     const discovery = await withZapierMcpSession(serverUrl, async (session) => {
       const tools = await session.listTools();
       const serverMode = detectServerMode(tools);
+      if (managedMetadata(connection.serverUrlFingerprint) && serverMode !== "agentic") throw new ZapierMcpError("Agentic tools are unavailable.", "tool_missing");
       if (serverMode !== "agentic") {
         return { tools, serverMode, actions: tools.map((tool) => ({
           app: "managed", appName: "Managed server", action: tool.name,
@@ -339,38 +266,6 @@ export async function listZapierEnabledActions(organizationId: string): Promise<
     if (error instanceof ZapierMcpError) await db.update(zapierMcpConnectionsTable).set({ lastErrorAt: new Date(), lastErrorCode: error.code }).where(currentConnection);
     throw error;
   }
-}
-
-export async function searchZapierActions(organizationId: string, app: string): Promise<unknown> {
-  const { serverUrl } = await requireZapierServerUrl(organizationId);
-  const query = app.trim().slice(0, 80);
-  return withZapierMcpSession(serverUrl, async (session) => {
-    const result = await session.callTool(ZAPIER_META_TOOLS.discover, { app: query });
-    return result.value;
-  });
-}
-
-export async function enableZapierAction(input: {
-  organizationId: string;
-  userId: string;
-  selectedApi: string;
-  action: string;
-}): Promise<unknown> {
-  const { serverUrl } = await requireZapierServerUrl(input.organizationId);
-  const result = await withZapierMcpSession(serverUrl, async (session) =>
-    session.callTool(ZAPIER_META_TOOLS.enable, {
-      selected_api: input.selectedApi.slice(0, 120),
-      action: input.action.slice(0, 120),
-    }),
-  );
-  await recordAudit({
-    organizationId: input.organizationId,
-    actorUserId: input.userId,
-    action: "integration.zapier_action_enabled",
-    entityType: "zapier_mcp_connection",
-    metadata: { selectedApi: input.selectedApi.slice(0, 120), action: input.action.slice(0, 120) },
-  });
-  return result.value;
 }
 
 // ---------- bindings and policies ----------
@@ -484,6 +379,7 @@ export async function bindZapierCapability(input: {
 }): Promise<ZapierCapabilityBinding> {
   const definition = getZapierCapability(input.capability);
   if (!definition) throw new ZapierBindingError("Unknown Zapier capability.");
+  const before = await getZapierConnection(input.organizationId);
   const live = (await listZapierEnabledActions(input.organizationId)).find(
     (row) => row.app === input.app && row.action === input.action,
   );
@@ -512,7 +408,9 @@ export async function bindZapierCapability(input: {
     boundByUserId: input.userId,
     verifiedAt: new Date(),
   };
-  const row = await db.transaction(async (tx) => {
+  const row = await withZapierOrgTransaction(input.organizationId, async (tx) => {
+    const current = await getZapierConnection(input.organizationId, tx);
+    if (!current || current.serverUrlFingerprint !== before?.serverUrlFingerprint) throw new ZapierBindingError("Connection changed. Refresh before binding.");
     // Save the binding and paused policy together; the owner chooses authority next.
     await tx.insert(zapierSpecialistPoliciesTable).values({
       organizationId: input.organizationId,
@@ -543,31 +441,35 @@ export async function bindZapierCapability(input: {
 }
 
 export async function unbindZapierCapability(organizationId: string, userId: string, capability: string): Promise<boolean> {
-  const rows = await db
-    .delete(zapierCapabilityBindingsTable)
-    .where(
-      and(
-        eq(zapierCapabilityBindingsTable.organizationId, organizationId),
-        eq(zapierCapabilityBindingsTable.capability, capability),
-      ),
-    )
-    .returning({ id: zapierCapabilityBindingsTable.id });
-  if (rows.length === 0) return false;
-  await db
-    .update(zapierSpecialistPoliciesTable)
-    .set({ mode: "off", updatedByUserId: userId })
-    .where(
-      and(
-        eq(zapierSpecialistPoliciesTable.organizationId, organizationId),
-        eq(zapierSpecialistPoliciesTable.capability, capability),
-      ),
-    );
+  const removed = await withZapierOrgTransaction(organizationId, async tx => {
+    const rows = await tx
+      .delete(zapierCapabilityBindingsTable)
+      .where(
+        and(
+          eq(zapierCapabilityBindingsTable.organizationId, organizationId),
+          eq(zapierCapabilityBindingsTable.capability, capability),
+        ),
+      )
+      .returning({ id: zapierCapabilityBindingsTable.id });
+    if (rows.length === 0) return null;
+    await tx
+      .update(zapierSpecialistPoliciesTable)
+      .set({ mode: "off", updatedByUserId: userId })
+      .where(
+        and(
+          eq(zapierSpecialistPoliciesTable.organizationId, organizationId),
+          eq(zapierSpecialistPoliciesTable.capability, capability),
+        ),
+      );
+    return rows[0]!;
+  });
+  if (!removed) return false;
   await recordAudit({
     organizationId,
     actorUserId: userId,
     action: "integration.zapier_capability_unbound",
     entityType: "zapier_capability_binding",
-    entityId: rows[0].id,
+    entityId: removed.id,
     metadata: { capability },
   });
   return true;
@@ -612,9 +514,6 @@ export async function setZapierPolicy(input: {
     throw new ZapierBindingError("Policy mode must be off, approve, or auto.");
   }
   const mode = input.mode as ZapierPolicyMode;
-  if (definition.key === CALLIE_TEXTBACK_CAPABILITY && mode !== "off" && !(await getCallieTextBackSettings(input.organizationId)).messagingRegistered) {
-    throw new ZapierBindingError("Confirm that your texting setup is registered (Twilio A2P 10DLC or Quo business texting) before turning on missed-call text-back.");
-  }
   const dailyBudget = Math.min(Math.max(Math.trunc(input.dailyBudget ?? definition.defaultDailyBudget), 0), 500);
   const values = {
     organizationId: input.organizationId,
@@ -624,14 +523,19 @@ export async function setZapierPolicy(input: {
     dailyBudget,
     updatedByUserId: input.userId,
   };
-  const [row] = await db
-    .insert(zapierSpecialistPoliciesTable)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [zapierSpecialistPoliciesTable.organizationId, zapierSpecialistPoliciesTable.capability],
-      set: { mode, dailyBudget, updatedByUserId: input.userId },
-    })
-    .returning();
+  const [row] = await withZapierOrgTransaction(input.organizationId, async tx => {
+    if (definition.key === CALLIE_TEXTBACK_CAPABILITY && mode !== "off" && !(await getCallieTextBackSettings(input.organizationId, tx)).messagingRegistered) {
+      throw new ZapierBindingError("Confirm that your texting setup is registered (Twilio A2P 10DLC or Quo business texting) before turning on missed-call text-back.");
+    }
+    return tx
+      .insert(zapierSpecialistPoliciesTable)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [zapierSpecialistPoliciesTable.organizationId, zapierSpecialistPoliciesTable.capability],
+        set: { mode, dailyBudget, updatedByUserId: input.userId },
+      })
+      .returning();
+  });
   await recordAudit({
     organizationId: input.organizationId,
     actorUserId: input.userId,

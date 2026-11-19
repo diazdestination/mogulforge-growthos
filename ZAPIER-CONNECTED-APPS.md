@@ -1,6 +1,6 @@
 # Zapier Connected Apps — specialist hands in the contractor's own tools
 
-Implemented 2026-10-29 on `feat/zapier-connected-apps`. This document is the
+Original capabilities implemented 2026-10-29; updated for MogulForge-managed provisioning. This document is the
 product-owned contract for the feature: what is built, what is deliberately
 not built, and how to verify it. It uses MogulForge GrowthOS terminology only.
 
@@ -8,7 +8,7 @@ not built, and how to verify it. It uses MogulForge GrowthOS terminology only.
 
 GrowthOS specialists are bounded workflows, not autonomous agents. Zapier
 Connected Apps gives seven of them a narrow set of *bound capabilities* in the
-apps a contractor already uses, through the contractor's own Zapier account:
+apps a contractor already uses, through a dedicated company connection managed and paid for by MogulForge. Contractors do not need a Zapier account or subscription; they still authorize their business-app data and business actions:
 
 | Specialist | Capability | Direction | Default policy |
 | --- | --- | --- | --- |
@@ -217,30 +217,15 @@ Zapier apps/actions it may bind to, and a deterministic input → parameter
 mapper. No model participates in choosing a capability, an action, or its
 parameters. Adding an app means adding a reviewed candidate there.
 
-## How a contractor connects
+## How the connection is managed
 
-1. An owner/admin opens Settings → Connections → Zapier Connected Apps and
-   clicks **Connect Zapier**. The Zapier MCP Embed (`<zapier-mcp>`) loads from
-   `https://mcp.zapier.com/embed/v1/mcp.js` with the member's email prefilled.
-2. The contractor signs in to (or creates) their own Zapier account inside the
-   embed and connects their apps (QuickBooks, Google Calendar, CallRail,
-   Twilio, Google Business Profile, Facebook Lead Ads, …).
-3. The embed emits `mcp-server-url`; the page POSTs it to
-   `POST /api/v1/integrations/zapier/server-url`. The server validates the host
-   is `mcp.zapier.com`, probes the server's tool list once, and stores the URL
-   AES-256-GCM encrypted with AAD `${organizationId}:zapier-mcp`
-   (`zapier_mcp_connections`). The API never returns the stored plaintext URL.
-4. GrowthOS loads enabled actions automatically and refreshes them when Zapier
-   reports tool changes. The contractor selects an available action and **binds**
-   each capability to one of them (`zapier_capability_bindings`), supplying
-   any non-secret binding settings (calendar id, sending number, Facebook Page,
-   crew phone numbers for SCHED).
-5. The contractor sets the policy per capability (`zapier_specialist_policies`):
-   `off`, `approve` (writes park for a human), or `auto` (bounded by a daily
-   budget, default 25–96 depending on the capability).
+1. A MogulForge platform administrator selects the exact company in Client Launchpad and assigns its dedicated server reference and private connection token. The operator confirms account ownership and client-only app configuration. See `ZAPIER-OPERATOR-SETUP.md` for provider and approval prerequisites.
+2. The transport sends that company's server-specific token in an Authorization header to Zapier's fixed Streamable HTTP endpoint. Credentials are stored with tenant-bound encryption; token/URL secrets never return to the client. Managed provisioning does not depend on old Embed credentials.
+3. Company Settings → Connections shows the status. No contractor Zapier signup/login is presented. Only the operator assigns/replaces credentials or enables provider actions. Authorized company members retain approved business-flow binding/policy controls and may revoke their own connection.
+4. Select an available reviewed action and save its required nonsecret settings. New or changed bindings/policies retain normal permission and approval checks. New/replaced credentials pause policies and invalidate stale bindings; unknown writes are not replayed.
+5. Operator-owned monthly action admission applies across capabilities in addition to per-flow daily policies. It is a conservative application ceiling, not a provider-dollar guarantee. Zero pauses dispatch; company policy changes cannot raise this operator ceiling.
 
-Disconnect revokes the connection, blanks the stored credential, switches every
-policy to `off`, and keeps the ledger and bindings as history.
+Disconnect removes the current credential, pauses policies and retains execution history. Legacy connection records remain identified as legacy/review-needed, not silently relabeled centrally owned.
 
 ## Execution ledger invariants
 
@@ -271,15 +256,10 @@ records with provenance (`source = zapier:<App>`, `import_source_key`,
 
 ## Platform configuration
 
-- `ZAPIER_MCP_EMBED_ID` (non-secret, sent to the browser) and
-  `ZAPIER_MCP_EMBED_SECRET` (bearer for GrowthOS → Zapier) come from
-  `https://mcp.zapier.com/manage/embed/config`. The allowed domain must be the
-  app's public origin. Both unset hides the feature; restore mode refuses
-  `ZAPIER_*` like every other provider prefix.
-- `OAUTH_TOKEN_ENCRYPTION_KEY` is reused for the server URL with a distinct
-  AAD context.
-- Zapier bills two tasks per successful tool call to the **contractor's**
-  Zapier account. GrowthOS fronts no per-customer usage.
+- A valid existing `OAUTH_TOKEN_ENCRYPTION_KEY` protects each tenant's versioned credential. Do not rotate it without recovery/re-encryption planning for other stored data.
+- A server-specific connection token authenticates at `https://mcp.zapier.com/api/v1/connect` using an Authorization header. Do not put tokens in URLs, repositories, browser storage or support messages. The operator must verify the intended MogulForge account and a dedicated client-scoped server/app configuration.
+- Legacy encrypted URL/Embed formats are retained for compatibility. The old contractor credential-provisioning route is retired. Existing `ZAPIER_MCP_EMBED_ID`/`SECRET` do not prove central billing or configure the new token path.
+- MogulForge owns the central Zapier bill. Ordinary MCP currently uses two tasks per successful tool call. Company execution counters are not a complete provider invoice: setup/discovery, account-wide activity and other provider rules can differ. Verify actual entitlement and usage before committing a fixed-price allowance. White Label is a separate possible selfservice option with separately verified access/pricing.
 
 ## Scheduler
 
@@ -293,9 +273,7 @@ read per capability per window. Writes never originate from the scheduler.
 ## Routes
 
 All under `/api/v1/integrations/zapier`; permissions are declared in
-`routes/v1/route-inventory.test.ts`. Connection, binding and policy changes
-require `settings.manage` and a signed-in human session (API keys are
-rejected). Flows require the permission of the record they act on
+`routes/v1/route-inventory.test.ts`. Credential assignment/replacement uses the human-platform-admin-only `/api/v1/platform/clients/:orgId/integrations/zapier` route with explicit company and version checks. Tenant credential provisioning and provider-action enablement are refused. Company binding/policy changes and voluntary revoke require `settings.manage` and a signed-in human session (API keys are rejected). Flows require the permission of the record they act on
 (`crm.write`, `invoices.manage`).
 
 ## Verification
@@ -315,9 +293,7 @@ database with the MCP transport faked in memory.
 
 ## Not built (explicit gates)
 
-- No live Zapier round trip has been run from this repository. A real embed id,
-  embed secret, and a contractor Zapier account with connected apps are
-  required before the feature is called beta-ready.
+- Local tests do not establish a live round trip. The verified MogulForge account/plan, dedicated per-company server/token, supported agentic meta-tool contract and client-only app authorizations require actual acceptance before automation is called beta-ready. Arbitrary direct-only servers are refused rather than admitted as unreviewed flow mappings.
 - Zapier app ids in the registry were verified against Zapier's catalog on
   2026-10-29 (`QuickBooksV3CLIAPI`, `GoogleCalendarCLIAPI`, `CallRailCLIAPI`,
   `TwilioCLIAPI`, `GoogleMyBusinessCLIAPI`, `FacebookLeadsCLIAPI`,

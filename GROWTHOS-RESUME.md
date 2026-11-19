@@ -184,7 +184,13 @@ success is necessary evidence, not proof of a public deployment.
   DB-backed two-tenant/two-sender suite remain required before this is called
   beta-ready. Docker/Postgres was stopped during this checkpoint.
 
-## Zapier Connected Apps — 2026-10-29
+## MogulForge-managed Zapier — current preparation
+
+The client setup model has changed: contractors need no separate Zapier account/subscription. A human platform administrator provisions a dedicated company-scoped server/token in Client Launchpad; company members retain business permissions and flow approvals. The token path uses fixed-endpoint Bearer authentication, existing tenant encryption and an operator-owned monthly action ceiling, without a schema migration or Embed dependency. See [operator setup](ZAPIER-OPERATOR-SETUP.md) and [current contract](ZAPIER-CONNECTED-APPS.md).
+
+Source/tests and actual provider acceptance remain separate. Account/plan rights, dedicated provider-side app scoping, token provisioning and an authorized destination round trip must be verified before calling this live-ready. The October29 checkpoint below is historical and does not prescribe current contractor billing or signup.
+
+## Zapier Connected Apps — historical 2026-10-29 checkpoint
 
 - [ZAPIER-CONNECTED-APPS.md](ZAPIER-CONNECTED-APPS.md) is the contract for the
   specialist capability layer that runs through each contractor's own Zapier

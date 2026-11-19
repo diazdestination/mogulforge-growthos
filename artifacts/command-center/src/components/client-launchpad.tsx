@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ClientStaffInvitations } from "./client-staff-invitations";
+import { ManagedZapierConnection } from "./managed-zapier-connection";
 
 type Profile = { id: string; name: string; services: [string, string][] };
 type Organization = {
@@ -275,6 +276,8 @@ function Launchpad({
         <ClientReadiness
           key={activeId}
           organizationId={activeId}
+          explicitSelection={selected === activeId}
+          onSelectTarget={() => setSelected(activeId)}
           actorId={actorId}
           currentOrgId={currentOrgId}
           profiles={profiles.data ?? []}
@@ -453,11 +456,15 @@ function CreateClient({
 
 function ClientReadiness({
   organizationId,
+  explicitSelection,
+  onSelectTarget,
   actorId,
   currentOrgId,
   profiles,
 }: {
   organizationId: string;
+  explicitSelection: boolean;
+  onSelectTarget: () => void;
   actorId: string;
   currentOrgId?: string;
   profiles: Profile[];
@@ -530,6 +537,11 @@ function ClientReadiness({
         organizationId={organizationId}
         needsOwner={report.staffing.activeManagers === 0}
       />
+      {explicitSelection ? (
+        <ManagedZapierConnection actorId={actorId} organizationId={organizationId} companyName={report.organization.name} />
+      ) : (
+        <Button variant="outline" onClick={onSelectTarget}>Set up Zapier for {report.organization.name}</Button>
+      )}
       {report.sites.length > 1 && (
         <div className="space-y-2">
           <Label htmlFor="readiness-site">Website connection</Label>

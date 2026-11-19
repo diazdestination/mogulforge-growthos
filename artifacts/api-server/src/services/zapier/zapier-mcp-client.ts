@@ -4,10 +4,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 /**
- * Thin, credential-bounded transport to one contractor's Zapier MCP server.
- *
- * - The platform embed secret authenticates GrowthOS to Zapier; the per-tenant
- *   server URL selects the contractor's own connected accounts.
+ * One session uses either the server-specific managed bearer at Zapier's
+ * fixed endpoint or a legacy encrypted URL with the platform Embed bearer.
  * - Nothing here decides *what* to call. Capability bindings and policies do.
  * - Raw tool results never leave this module untouched: callers receive a
  *   parsed JSON value plus its digest, and the digest is what gets persisted.
@@ -122,15 +120,15 @@ function classifyTransportError(error: unknown): ZapierMcpError {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
   if (normalized.includes("401") || normalized.includes("unauthorized") || normalized.includes("mcpauthorizationerror")) {
-    return new ZapierMcpError("Zapier rejected the GrowthOS embed credential or this server.", "unauthorized");
+    return new ZapierMcpError("Zapier rejected the connection credential.", "unauthorized");
   }
   if (normalized.includes("task limit") || normalized.includes("task_limit")) {
-    return new ZapierMcpError("The contractor's Zapier account reached its task limit.", "task_limit");
+    return new ZapierMcpError("The connected Zapier account reached its task limit.", "task_limit");
   }
   if (normalized.includes("abort") || normalized.includes("timeout") || normalized.includes("timed out")) {
     return new ZapierMcpError("Zapier did not answer in time; the effect may have occurred.", "timeout", true);
   }
-  return new ZapierMcpError("Could not reach the contractor's Zapier MCP server.", "connect_failed");
+  return new ZapierMcpError("Could not reach the connected Zapier MCP server.", "connect_failed");
 }
 
 export type ZapierMcpSession = {
@@ -148,15 +146,38 @@ export async function withZapierMcpSession<T>(
   fn: (session: ZapierMcpSession) => Promise<T>,
   options: { timeoutMs?: number; config?: ZapierMcpConfig | null } = {},
 ): Promise<T> {
-  const config = options.config === undefined ? zapierMcpConfig() : options.config;
-  if (!config) {
-    throw new ZapierMcpError("Zapier Connected Apps is not configured on this GrowthOS deployment.", "not_configured");
+  let url: URL;
+  let bearer: string;
+  let sensitiveUrl: string | null = null;
+  if (serverUrl.startsWith("{")) {
+    let envelope: { version?: unknown; source?: unknown; connectionToken?: unknown };
+    try {
+      envelope = JSON.parse(serverUrl);
+    } catch {
+      throw new ZapierMcpError("Invalid managed credential.", "not_configured");
+    }
+    if (envelope?.version !== 1 || envelope.source !== "mogulforge" ||
+        typeof envelope.connectionToken !== "string" || !/^[!-~]{1,4096}$/.test(envelope.connectionToken)) {
+      throw new ZapierMcpError("Invalid managed credential.", "not_configured");
+    }
+    url = new URL("https://mcp.zapier.com/api/v1/connect");
+    bearer = envelope.connectionToken;
+  } else {
+    const config = options.config === undefined ? zapierMcpConfig() : options.config;
+    if (!config) throw new ZapierMcpError("Legacy Zapier credentials are unavailable.", "not_configured");
+    url = validateZapierServerUrl(serverUrl);
+    bearer = config.embedSecret;
+    sensitiveUrl = url.href;
   }
-  const url = validateZapierServerUrl(serverUrl);
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const client = new Client({ name: "mogulforge-growthos", version: "1.0.0" });
   const transport = new StreamableHTTPClientTransport(url, {
-    requestInit: { headers: { Authorization: `Bearer ${config.embedSecret}` } },
+    requestInit: { redirect: "error", headers: { Authorization: `Bearer ${bearer}` } },
+    fetch: async (resource, init) => {
+      const target = resource instanceof Request ? resource.url : String(resource);
+      if (target !== url.href) throw new ZapierMcpError("Unexpected Zapier transport destination.", "connect_failed");
+      return fetch(resource, { ...init, redirect: "error" });
+    },
   });
   try {
     await client.connect(transport);
@@ -164,10 +185,23 @@ export async function withZapierMcpSession<T>(
     await transport.close().catch(() => undefined);
     throw classifyTransportError(error);
   }
+  const rejectCredentialEcho = (value: unknown, dispatched = false): void => {
+    if (typeof value === "string") {
+      if (value.includes(bearer) || (sensitiveUrl && value.includes(sensitiveUrl))) {
+        throw new ZapierMcpError("Zapier returned an unsafe response.", "malformed_result", dispatched);
+      }
+    } else if (value && typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        rejectCredentialEcho(key, dispatched);
+        rejectCredentialEcho(child, dispatched);
+      }
+    }
+  };
   const session: ZapierMcpSession = {
     async listTools() {
       try {
         const result = await client.listTools(undefined, { timeout: timeoutMs });
+        rejectCredentialEcho(result.tools);
         return result.tools.map((tool) => ({ name: tool.name, description: tool.description ?? null }));
       } catch (error) {
         throw classifyTransportError(error);
@@ -181,10 +215,16 @@ export async function withZapierMcpSession<T>(
           isError?: boolean;
         };
       } catch (error) {
-        throw classifyTransportError(error);
+        const failure = classifyTransportError(error);
+        if (failure.code === "connect_failed") {
+          throw new ZapierMcpError("Zapier did not confirm the action outcome.", "connect_failed", true);
+        }
+        throw failure;
       }
       const text = textOf(raw.content);
+      rejectCredentialEcho(text, true);
       const value = parseToolText(text);
+      rejectCredentialEcho(value, true);
       return { value, digest: sha256Hex(canonicalJson(value)), isError: Boolean(raw.isError) };
     },
   };

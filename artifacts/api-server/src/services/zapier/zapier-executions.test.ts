@@ -13,6 +13,7 @@ import {
   zapierMcpConnectionsTable,
   zapierSpecialistPoliciesTable,
 } from "@workspace/db";
+import * as credentialFence from "./zapier-credential-metadata";
 import { createHash } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
@@ -67,7 +68,6 @@ import {
   getZapierStatus,
   listZapierEnabledActions,
   listZapierCapabilities,
-  registerZapierServerUrl,
   setZapierPolicy,
 } from "./zapier-connection";
 import {
@@ -77,8 +77,8 @@ import {
   requestZapierAction,
   ZapierExecutionError,
 } from "./zapier-executions";
-import { ZapierMcpError } from "./zapier-mcp-client";
-import { apptPushAppointmentToCalendar, buildAppointmentCalendarInput, invoPushInvoiceToAccounting, scoutSyncMarketplaceLeads } from "./zapier-specialist-flows";
+import { sha256Hex, validateZapierServerUrl, ZapierMcpError } from "./zapier-mcp-client";
+import { apptPushAppointmentToCalendar, buildAppointmentCalendarInput, buildInvoiceAccountingInput, invoPushInvoiceToAccounting, scoutSyncMarketplaceLeads } from "./zapier-specialist-flows";
 import { processZapierConnectedApps } from "./zapier-runtime";
 
 const previousEnv = {
@@ -90,6 +90,23 @@ const previousEnv = {
 const orgIds: string[] = [];
 const userIds: string[] = [];
 const SERVER_URL = "https://mcp.zapier.com/api/mcp/s/synthetic-server/mcp";
+
+// Historical fixtures exercise legacy decryption, discovery, and execution.
+async function seedLegacyConnection(input: {organizationId: string; userId: string; serverUrl: string}) {
+  const url = validateZapierServerUrl(input.serverUrl);
+  const values = {
+    organizationId: input.organizationId, connectedByUserId: input.userId,
+    encryptedServerUrl: encryptSecret(url.href, input.organizationId + ":zapier-mcp"),
+    serverUrlFingerprint: sha256Hex(url.href), serverHost: url.hostname,
+    serverMode: "agentic" as const, toolCount: 3, connectedAt: new Date(), revokedAt: null,
+  };
+  const [prior] = await db.select().from(zapierMcpConnectionsTable).where(eq(zapierMcpConnectionsTable.organizationId,input.organizationId));
+  await db.insert(zapierMcpConnectionsTable).values(values).onConflictDoUpdate({ target: zapierMcpConnectionsTable.organizationId, set: values });
+  if (prior && prior.serverUrlFingerprint !== values.serverUrlFingerprint) {
+    await db.update(zapierSpecialistPoliciesTable).set({mode:"off"}).where(eq(zapierSpecialistPoliciesTable.organizationId,input.organizationId));
+  }
+  return getZapierStatus(input.organizationId);
+}
 
 async function seedTenant(suffix: string, nonce: string) {
   const [org] = await db
@@ -164,7 +181,7 @@ afterAll(async () => {
 
 describe("Zapier connection", () => {
   it("stores the server URL encrypted with the organization as AAD and never exposes it", async () => {
-    const status = await registerZapierServerUrl({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
+    const status = await seedLegacyConnection({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
     expect(status).toMatchObject({ configured: true, connected: true, serverMode: "agentic", toolCount: 3 });
     expect(JSON.stringify(status)).not.toContain("synthetic-server");
     const [row] = await db.select().from(zapierMcpConnectionsTable).where(eq(zapierMcpConnectionsTable.organizationId, orgIds[0]!));
@@ -178,7 +195,7 @@ describe("Zapier connection", () => {
 
   it("rejects server URLs that are not Zapier's", async () => {
     await expect(
-      registerZapierServerUrl({ organizationId: orgIds[1]!, userId: userIds[1]!, serverUrl: "https://attacker.example/mcp" }),
+      seedLegacyConnection({ organizationId: orgIds[1]!, userId: userIds[1]!, serverUrl: "https://attacker.example/mcp" }),
     ).rejects.toBeInstanceOf(ZapierMcpError);
     expect((await getZapierStatus(orgIds[1]!)).connected).toBe(false);
   });
@@ -246,10 +263,10 @@ describe("Zapier connection", () => {
 
   it("retains authority for the same server but pauses flows when switching accounts", async () => {
     await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "auto", dailyBudget: 17 });
-    await registerZapierServerUrl({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
+    await seedLegacyConnection({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
     const policy = async () => (await listZapierCapabilities(orgIds[0]!)).find((item) => item.key === "appt.calendar.create_event")?.policy;
     expect(await policy()).toMatchObject({ mode: "auto", dailyBudget: 17 });
-    await registerZapierServerUrl({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: "https://mcp.zapier.com/api/mcp/s/other-synthetic-account/mcp" });
+    await seedLegacyConnection({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: "https://mcp.zapier.com/api/mcp/s/other-synthetic-account/mcp" });
     expect(await policy()).toMatchObject({ mode: "off", dailyBudget: 17 });
     expect((await listZapierCapabilities(orgIds[1]!)).every((view) => view.policy.mode === "off")).toBe(true);
   });
@@ -312,6 +329,45 @@ describe("Zapier execution ledger", () => {
     invoiceId = invoice!.id;
   });
 
+  it.each(["off", "rebind", "approve"] as const)("refuses an accounting write queued across a %s change before debiting or dispatching", async change => {
+    const organizationId = orgIds[0]!;
+    const userId = userIds[0]!;
+    const capability = "invo.accounting.create_invoice";
+    const policy = { organizationId, userId, capability };
+    const binding = { ...policy, app: "QuickBooksV3CLIAPI", action: "invoice" };
+    await setZapierPolicy({ ...policy, mode: "auto", dailyBudget: 25 });
+    const { input } = await buildInvoiceAccountingInput(organizationId, invoiceId);
+    let entered!: () => void, release!: () => void;
+    const queued = new Promise<void>(resolve => { entered = resolve; });
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const acquire = credentialFence.withZapierOrgTransaction;
+    const gate = vi.spyOn(credentialFence, "withZapierOrgTransaction").mockImplementationOnce(async (org, callback) => {
+      entered();
+      await hold;
+      return acquire(org, callback);
+    });
+    const pending = requestZapierAction({ organizationId, capability, input, idempotencyKey: "queued-invoice-" + change, requestedByUserId: userId });
+    try {
+      await queued;
+      if (change === "rebind") {
+        await bindZapierCapability({ ...binding, zapierConnectionId: "other-reviewed-account" });
+        await setZapierPolicy({ ...policy, mode: "auto", dailyBudget: 25 });
+      } else {
+        await setZapierPolicy({ ...policy, mode: change, dailyBudget: 25 });
+      }
+      release();
+      const { execution } = await pending;
+      expect(execution.errorCode).toBe({off:"policy_off", rebind:"stale_request", approve:"approval_required"}[change]);
+      expect(execution.startedAt).toBeNull();
+      expect(fake.calls.filter(call => call.name === "execute_zapier_write_action")).toHaveLength(0);
+    } finally {
+      release();
+      gate.mockRestore();
+      if (change === "rebind") await bindZapierCapability(binding);
+      await setZapierPolicy({ ...policy, mode: "approve", dailyBudget: 25 });
+    }
+  });
+
   it("runs an auto write once through a durable receipt and replays return the same receipt", async () => {
     const first = await apptPushAppointmentToCalendar({ organizationId: orgIds[0]!, appointmentId, actorUserId: userIds[0]! });
     expect(first.execution.state).toBe("succeeded");
@@ -338,7 +394,7 @@ describe("Zapier execution ledger", () => {
     const built = await buildAppointmentCalendarInput(orgIds[0]!, appointmentId);
     const pending = await requestZapierAction({ organizationId: orgIds[0]!, capability: "appt.calendar.create_event", input: built.input, idempotencyKey: "server-switch-approval", linkedEntityType: "appointment", linkedEntityId: appointmentId });
     expect(pending.execution.state).toBe("pending_approval");
-    await registerZapierServerUrl({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
+    await seedLegacyConnection({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
     fake.calls.length = 0;
     const result = await approveZapierAction({ organizationId: orgIds[0]!, executionId: pending.execution.id, userId: userIds[0]! });
     expect(result.state).toBe("blocked");

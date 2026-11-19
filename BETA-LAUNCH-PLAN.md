@@ -70,8 +70,7 @@ delivery or carrier approval.
 ## Owner inputs still required
 
 1. Google OAuth client id/secret (Gmail sending) and a Resend domain.
-2. Zapier MCP embed id and secret (`mcp.zapier.com` → Manage → Embed; allowed
-   domain `app.mogulforge.ai`).
+2. Verified MogulForge Zapier plan and a dedicated per-company server-specific connection token, with client-only app authorizations and the existing encryption key. Operators configure this in Client Launchpad; contractors need no Zapier subscription. See `ZAPIER-OPERATOR-SETUP.md`. Legacy Embed credentials are not the new managed setup.
 3. Stripe keys for card/bank collection when BILL's collection ships.
 4. Website tier names and monthly prices, for Billing.
 

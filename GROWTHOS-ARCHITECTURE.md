@@ -74,10 +74,10 @@ is untrusted data and can never grant an agent instructions or tool authority.
 The module/scoping and continuous-scouting contract is maintained in
 [GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md).
 
-## Contractor-owned Connected Apps (Zapier)
+## MogulForge-managed Connected Apps (Zapier)
 
 Specialists reach outside GrowthOS only through bound capabilities that run on
-the contractor's own Zapier MCP server. The capability registry is the whole
+a dedicated per-company Zapier MCP server managed and paid for by MogulForge; contractors need no Zapier subscription. The capability registry is the whole
 vocabulary; a contractor binds each capability to one enabled Zapier action
 and sets `off`, `approve`, or `auto` with a daily budget. Writes are owned by
 durable execution receipts, approvals re-derive the request from the linked

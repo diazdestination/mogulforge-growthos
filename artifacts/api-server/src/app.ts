@@ -73,6 +73,18 @@ app.use("/api/v1/bie/claims", express.json({ limit: "8mb" }));
 // Customer estimate approval posts a drawn signature (PNG data URL, capped at
 // 200,000 characters by the service and the table check).
 app.use("/api/v1/public/estimate-approvals", express.json({ limit: "300kb" }));
+// A managed credential request can contain a bearer token. Handle parser errors
+// before the general parser or Express error logger can retain the input.
+const managedCredentialJson = express.json();
+app.use("/api/v1/platform/clients/:orgId/integrations/zapier", (req, res, next) => {
+  managedCredentialJson(req, res, (error?: { type?: string }) => {
+    if (!error) return next();
+    res.status(error.type === "entity.too.large" ? 413 : 400).json({
+      error: "Invalid managed Zapier request.",
+      code: "zapier_invalid_request",
+    });
+  });
+});
 // Keep the raw body around for webhook signature verification (Resend/svix
 // signs the exact bytes, not the re-serialized JSON).
 app.use(

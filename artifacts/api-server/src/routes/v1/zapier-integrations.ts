@@ -7,12 +7,9 @@ import { ZAPIER_EXECUTION_STATES, type ZapierExecutionState } from "@workspace/d
 import {
   bindZapierCapability,
   disconnectZapier,
-  enableZapierAction,
   getZapierStatus,
   listZapierCapabilities,
   listZapierEnabledActions,
-  registerZapierServerUrl,
-  searchZapierActions,
   setZapierPolicy,
   setZapierPollInterval,
   unbindZapierCapability,
@@ -94,8 +91,9 @@ function fail(res: Response, error: unknown): void {
   res.status(500).json({ error: "Zapier Connected Apps request failed." });
 }
 
-const serverUrlBody = z.object({ serverUrl: z.string().min(1).max(2000) });
-const enableBody = z.object({ selectedApi: z.string().min(1).max(120), action: z.string().min(1).max(120) });
+const managedByPlatform: RequestHandler = (_req, res) => {
+  res.status(403).json({ error: "Contact MogulForge to manage this connection or add an app." });
+};
 const bindingBody = z.object({
   app: z.string().min(1).max(120),
   action: z.string().min(1).max(120),
@@ -117,25 +115,7 @@ router.get("/integrations/zapier", requireMember("crm.read"), async (req: Reques
   res.json(await getZapierStatus(req.member!.organizationId));
 });
 
-router.post(
-  "/integrations/zapier/server-url",
-  requireMember("settings.manage"),
-  sessionOnly,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const body = serverUrlBody.parse(req.body);
-      res.json(
-        await registerZapierServerUrl({
-          organizationId: req.member!.organizationId,
-          userId: req.member!.user.id,
-          serverUrl: body.serverUrl,
-        }),
-      );
-    } catch (error) {
-      fail(res, error);
-    }
-  },
-);
+router.post("/integrations/zapier/server-url", requireMember("settings.manage"), sessionOnly, managedByPlatform);
 
 router.delete(
   "/integrations/zapier",
@@ -170,39 +150,8 @@ router.get("/integrations/zapier/actions", requireMember("settings.manage"), asy
   }
 });
 
-router.get("/integrations/zapier/actions/search", requireMember("settings.manage"), async (req: Request, res: Response): Promise<void> => {
-  const app = typeof req.query.app === "string" ? req.query.app : "";
-  if (!app.trim()) {
-    res.status(400).json({ error: "Provide an app name to search." });
-    return;
-  }
-  try {
-    res.json({ results: await searchZapierActions(req.member!.organizationId, app) });
-  } catch (error) {
-    fail(res, error);
-  }
-});
-
-router.post(
-  "/integrations/zapier/actions/enable",
-  requireMember("settings.manage"),
-  sessionOnly,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const body = enableBody.parse(req.body);
-      res.json({
-        result: await enableZapierAction({
-          organizationId: req.member!.organizationId,
-          userId: req.member!.user.id,
-          selectedApi: body.selectedApi,
-          action: body.action,
-        }),
-      });
-    } catch (error) {
-      fail(res, error);
-    }
-  },
-);
+router.get("/integrations/zapier/actions/search", requireMember("settings.manage"), managedByPlatform);
+router.post("/integrations/zapier/actions/enable", requireMember("settings.manage"), sessionOnly, managedByPlatform);
 
 // ---------- capabilities, bindings, policies ----------
 

@@ -45,6 +45,10 @@ const SESSION_ONLY_ROUTES = new Set([
   "POST /platform/orgs/:id/billing/replacement",
   "POST /platform/orgs/:id/billing/reconcile",
   "GET /platform/clients/profiles",
+  "GET /platform/clients/:orgId/integrations/zapier",
+  "PUT /platform/clients/:orgId/integrations/zapier",
+  "DELETE /platform/clients/:orgId/integrations/zapier",
+
   "GET /platform/clients/health",
   "GET /platform/runtime",
   "GET /platform/email-deliveries",

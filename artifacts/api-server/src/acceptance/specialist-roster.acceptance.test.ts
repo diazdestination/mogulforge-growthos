@@ -59,7 +59,9 @@ vi.mock("../services/zapier/zapier-mcp-client", async (importOriginal) => {
   return {
     ...actual,
     withZapierMcpSession: async (serverUrl: string, fn: (session: unknown) => Promise<unknown>) => {
-      actual.validateZapierServerUrl(serverUrl);
+      const credential = JSON.parse(serverUrl);
+      expect(credential.source).toBe("mogulforge");
+      expect(credential.connectionToken).toBe("synthetic-token-" + credential.serverReference);
       return fn({
         listTools: async () => [
           { name: "inspect_zapier_actions", description: null },
@@ -120,7 +122,7 @@ stripe.client = {
 // ---------- HTTP harness ----------
 
 const APP_ORIGIN = "https://growth.example";
-const ZAPIER_URL = "https://mcp.zapier.com/api/mcp/s/synthetic-roster/mcp";
+let operatorSid: string;
 const DAY = 86_400_000;
 let server: Server;
 let origin: string;
@@ -203,7 +205,13 @@ async function connectZapier(
   f: Company,
   bindings: { capability: string; app: string; action: string; config?: Record<string, string>; mode: "off" | "approve" | "auto" }[],
 ) {
-  const connected = await post(f.owner.sid, "/integrations/zapier/server-url", { serverUrl: ZAPIER_URL });
+  const endpoint = `/platform/clients/${f.org}/integrations/zapier`;
+  const current = await get(operatorSid, endpoint);
+  expect(current.status).toBe(200);
+  const connected = await put(operatorSid, endpoint, {
+    serverReference: f.org, connectionToken: "synthetic-token-" + f.org, ownershipConfirmed: true,
+    dedicatedConnectionConfirmed: true, expectedConnectionFingerprint: current.body.status.connectionFingerprint,
+  });
   expect(connected.status, connected.text).toBe(200);
   for (const binding of bindings) {
     const bound = await put(f.owner.sid, `/integrations/zapier/capabilities/${binding.capability}/binding`, { app: binding.app, action: binding.action, config: binding.config ?? {} });
@@ -229,6 +237,9 @@ beforeAll(async () => {
     const running = app.listen(0, "127.0.0.1", () => resolve(running));
   });
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const operator = await company("platform");
+  await db.update(usersTable).set({ isPlatformAdmin: true }).where(eq(usersTable.id, operator.owner.id));
+  operatorSid = operator.owner.sid;
 });
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -238,8 +249,8 @@ beforeEach(() => {
     APP_ORIGIN,
     GROWTHOS_OUTBOUND_HOLD: "false",
     OAUTH_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
-    ZAPIER_MCP_EMBED_ID: "synthetic-roster-embed",
-    ZAPIER_MCP_EMBED_SECRET: "synthetic-roster-embed-secret-never-deploy",
+    ZAPIER_MCP_EMBED_ID: "",
+    ZAPIER_MCP_EMBED_SECRET: "",
     STRIPE_CONNECT_WEBHOOK_SECRET: "whsec_synthetic_roster",
     GOOGLE_OAUTH_CLIENT_ID: "synthetic",
     GOOGLE_OAUTH_CLIENT_SECRET: "synthetic",
