@@ -2,6 +2,13 @@
 
 # GrowthOS Paid Beta Readiness — P0 Execution Order
 
+**October 27 CSS scope correction:** The October 9 owner intake restores
+contractor payment collection to engineering scope for the CSS switch. Older
+payment-deferral statements and the P1 list below do not waive CSS requirements.
+Signed estimates, deposits, progress payments and financing remain separately
+unaccepted. Provider selection/activation, financial actions and real onboarding
+retain their gates. See [current CSS readiness](reports/css-onboarding-readiness-2026-10-27.md).
+
 **Status:** ACTIVE RELEASE DIRECTIVE  
 **Primary branch:** `agent/mogulforge-growthos-recovery`  
 **CI-green starting baseline:** `ee7f39cc124dfcfa299b9daa165ba2579166756b` (September 29; [run 36523072054](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36523072054))
